@@ -1,0 +1,1595 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>AltStore Source Manager</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23101426'/><path d='M16 7v13m0 0 5-5m-5 5-5-5M9 24h14' stroke='%23E8B04B' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ---------------------------------------------------------------- tokens */
+:root{
+  --bg:#101426;
+  --panel:#171C33;
+  --panel-2:#1E2444;
+  --line:#2A3157;
+  --line-soft:#232A4D;
+  --text:#E6E8F2;
+  --muted:#8B93B8;
+  --accent:#E8B04B;
+  --accent-dim:#8A6A2E;
+  --accent-wash:rgba(232,176,75,.12);
+  --ok:#5FD0A0;
+  --err:#F2707A;
+  --err-wash:rgba(242,112,122,.12);
+
+  --ui:"Archivo",ui-sans-serif,system-ui,-apple-system,"Segoe UI","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --r:10px;
+  --pad:20px;
+  --shadow:0 18px 48px -12px rgba(0,0,0,.7);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--ui);
+  font-size:15px;
+  line-height:1.5;
+  letter-spacing:-.006em;
+  min-height:100dvh;
+  -webkit-font-smoothing:antialiased;
+}
+/* A single faint diagonal wash keeps the indigo from reading as flat black. */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(120% 70% at 82% -12%,rgba(232,176,75,.055),transparent 62%);
+}
+button,input,select,textarea{font:inherit;color:inherit;letter-spacing:inherit}
+button{cursor:pointer;background:none;border:none;padding:0}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.mono{font-family:var(--mono);font-size:.82em;letter-spacing:-.01em}
+
+/* ---------------------------------------------------------------- chrome */
+.wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:0 var(--pad)}
+
+header.top{
+  position:sticky;top:0;z-index:30;
+  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line-soft);
+}
+.top-in{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:14px var(--pad);max-width:1080px;margin:0 auto;
+}
+.brand{display:flex;align-items:baseline;gap:9px;min-width:0;flex:1 1 auto}
+.brand h1{
+  margin:0;font-size:17px;font-weight:600;letter-spacing:-.02em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;
+}
+.brand .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none;align-self:center}
+
+/* Language switch: two characters each, so a plain segmented control. */
+.lang{display:flex;gap:2px;padding:2px;background:var(--panel);border:1px solid var(--line);border-radius:99px;flex:none}
+.lang button{
+  padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;
+  color:var(--muted);transition:background .15s ease,color .15s ease;
+}
+.lang button:hover{color:var(--text)}
+.lang button[aria-pressed="true"]{background:var(--accent);color:#141326}
+
+.urlbar{
+  display:flex;align-items:center;gap:8px;flex:0 1 auto;min-width:0;
+  background:var(--panel);border:1px solid var(--line);border-radius:99px;
+  padding:5px 5px 5px 14px;
+}
+.urlbar .scheme{color:var(--muted);font-family:var(--mono);font-size:12.5px}
+.urlbar .path{font-family:var(--mono);font-size:12.5px;color:var(--accent);white-space:nowrap}
+.copy{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--accent);color:#141326;border-radius:99px;
+  padding:6px 13px;font-size:12.5px;font-weight:600;
+  transition:background .15s ease;
+}
+.copy:hover{background:#F3C368}
+.copy.done{background:var(--ok);color:#0B2318}
+
+.toolbar{display:flex;align-items:center;gap:10px;padding:22px 0 14px;flex-wrap:wrap}
+.search{position:relative;flex:1 1 220px;min-width:0}
+.search input{
+  width:100%;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:10px 14px 10px 36px;font-size:14px;
+}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+input::placeholder,textarea::placeholder{color:color-mix(in srgb,var(--muted) 70%,transparent)}
+input,select,textarea{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:10px 12px;width:100%;transition:border-color .15s ease;
+}
+input:hover,select,textarea:hover{border-color:color-mix(in srgb,var(--line) 60%,var(--muted))}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
+textarea{resize:vertical;min-height:84px;line-height:1.55}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 17px) 50%,calc(100% - 12px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:34px}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:10px 15px;font-size:14px;font-weight:500;white-space:nowrap;
+  transition:background .15s ease,border-color .15s ease;
+}
+.btn:hover{background:var(--panel-2);border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#141326;font-weight:600}
+.btn.primary:hover{background:#F3C368;border-color:#F3C368}
+.btn.danger{color:var(--err);border-color:color-mix(in srgb,var(--err) 35%,var(--line))}
+.btn.danger:hover{background:var(--err-wash);border-color:var(--err)}
+.btn.ghost{background:none;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{background:var(--panel);color:var(--text)}
+.btn[disabled]{opacity:.45;pointer-events:none}
+/* .btn sets display:inline-flex, which would otherwise beat the UA [hidden] rule */
+[hidden]{display:none!important}
+.btn.sm{padding:6px 11px;font-size:13px}
+.btn.icon{padding:8px;border-color:transparent;background:none;color:var(--muted)}
+.btn.icon:hover{background:var(--panel-2);color:var(--text)}
+
+/* ---------------------------------------------------------------- list */
+.list{border-top:1px solid var(--line-soft);margin-bottom:64px}
+.row{
+  position:relative;display:grid;
+  grid-template-columns:44px minmax(0,1fr) auto;
+  gap:14px;align-items:center;
+  padding:16px 8px 16px 18px;
+  border-bottom:1px solid var(--line-soft);
+  transition:background .15s ease;
+}
+.row:hover{background:color-mix(in srgb,var(--panel) 55%,transparent)}
+/* The app's real AltStore tintColor, straight from the source document. */
+.row::before{
+  content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:2px;
+  background:var(--tint,var(--accent-dim));opacity:.85;
+}
+.row.off{opacity:.5}
+.row.off::before{background:var(--muted)}
+
+.icon{
+  width:44px;height:44px;border-radius:11px;flex:none;object-fit:cover;display:block;
+  background:var(--panel-2);border:1px solid var(--line);
+}
+.icon.mono-face{
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:18px;color:var(--tint,var(--accent));
+  background:color-mix(in srgb,var(--tint,var(--accent)) 14%,var(--panel));
+}
+
+.row-main{min-width:0}
+.row-title{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+/* min-width:0 matters: a flex item defaults to min-width:auto, so an
+   unbreakable token like com.example.app refuses to shrink and widens
+   the whole page instead of truncating. */
+.row-title h3{margin:0;font-size:15.5px;font-weight:600;letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pill{
+  font-family:var(--mono);font-size:11.5px;padding:2px 8px;border-radius:99px;
+  background:var(--accent-wash);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);
+  white-space:nowrap;
+}
+.pill.quiet{background:var(--panel-2);color:var(--muted);border-color:var(--line)}
+.row-meta{
+  margin-top:5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  color:var(--muted);font-family:var(--mono);font-size:12px;min-width:0;
+}
+.row-meta span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-meta .sep{flex:none}
+.row-meta .sep{opacity:.4}
+.row-actions{display:flex;gap:4px;align-items:center}
+.row-side{display:none}
+
+/* ---------------------------------------------------------------- groups */
+.glist{border-top:1px solid var(--line-soft)}
+.gitem{
+  position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;
+  gap:12px;align-items:center;padding:14px 4px 14px 16px;
+  border-bottom:1px solid var(--line-soft);
+}
+.gitem::before{
+  content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:2px;
+  background:var(--tint,var(--accent-dim));opacity:.85;
+}
+.gitem .gname{font-weight:600;font-size:14.5px;letter-spacing:-.015em}
+.gitem .gurl{
+  font-family:var(--mono);font-size:12px;color:var(--accent);margin-top:4px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.gitem .gcount{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap;text-align:right}
+.gitem .gcount.zero{color:var(--err)}
+.gitem.loose::before{background:var(--muted)}
+
+/* ---------------------------------------------------------------- states */
+.empty{
+  border:1px dashed var(--line);border-radius:14px;padding:52px 28px;text-align:center;
+  margin:32px 0 64px;
+}
+.empty h2{margin:0 0 8px;font-size:17px;font-weight:600}
+.empty p{margin:0 auto 20px;color:var(--muted);max-width:44ch;font-size:14px}
+
+.note{
+  display:flex;gap:10px;align-items:flex-start;
+  background:var(--panel);border:1px solid var(--line);border-left:2px solid var(--accent);
+  border-radius:8px;padding:11px 14px;font-size:13px;color:var(--muted);margin:0 0 16px;
+}
+.note.bad{border-left-color:var(--err);background:var(--err-wash);color:#F8C4C8}
+.note b{color:var(--text);font-weight:600}
+
+.loading{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13.5px;padding:20px 4px}
+.spin{
+  width:14px;height:14px;border-radius:50%;flex:none;
+  border:2px solid var(--line);border-top-color:var(--accent);
+  animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------------------------------------------------------------- drawer */
+.scrim{
+  position:fixed;inset:0;z-index:40;background:rgba(6,8,18,.66);
+  backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .22s ease;
+}
+.scrim.on{opacity:1;pointer-events:auto}
+
+.drawer{
+  position:fixed;z-index:50;inset:0;display:flex;flex-direction:column;
+  background:var(--bg);border-left:1px solid var(--line);
+  transform:translateX(101%);transition:transform .28s cubic-bezier(.32,.72,0,1);
+  visibility:hidden;
+}
+.drawer.on{transform:none;visibility:visible}
+.drawer-head{
+  display:flex;align-items:center;gap:12px;padding:16px var(--pad);
+  border-bottom:1px solid var(--line);flex:none;
+  padding-top:max(16px,env(safe-area-inset-top));
+}
+.drawer-head h2{margin:0;font-size:16px;font-weight:600;flex:1;letter-spacing:-.015em}
+.drawer-body{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:20px var(--pad) 32px}
+.drawer-foot{
+  flex:none;display:flex;gap:10px;padding:14px var(--pad);
+  padding-bottom:max(14px,env(safe-area-inset-bottom));
+  border-top:1px solid var(--line);background:var(--panel);
+}
+.drawer-foot .btn{flex:1}
+.drawer-foot .btn.ghost{flex:0 0 auto}
+
+/* ---------------------------------------------------------------- form */
+fieldset{border:none;margin:0 0 26px;padding:0}
+legend{
+  font-size:12.5px;font-weight:600;color:var(--muted);letter-spacing:.02em;
+  padding:0 0 12px;margin:0;display:block;width:100%;
+  border-bottom:1px solid var(--line-soft);margin-bottom:16px;
+}
+.field{margin-bottom:15px}
+.field > label{display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:color-mix(in srgb,var(--text) 88%,transparent)}
+.field .hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
+.field .hint code{font-family:var(--mono);font-size:11.5px;background:var(--panel-2);padding:1.5px 5px;border-radius:4px;color:var(--accent)}
+.grid2{display:grid;grid-template-columns:1fr;gap:0 14px}
+.inline{display:flex;align-items:center;gap:10px}
+.check-row{margin:0 0 15px}
+.check{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13.5px}
+.check input{width:17px;height:17px;flex:none;margin:2px 0 0;accent-color:var(--accent);padding:0}
+.check span small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+
+details.adv{border:1px solid var(--line);border-radius:var(--r);margin-bottom:18px;background:var(--panel)}
+details.adv > summary{
+  padding:11px 14px;font-size:13.5px;font-weight:500;cursor:pointer;list-style:none;
+  display:flex;align-items:center;gap:8px;color:var(--muted);
+}
+details.adv > summary::-webkit-details-marker{display:none}
+details.adv > summary::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(-45deg);transition:transform .18s ease;flex:none;margin-left:2px}
+details.adv[open] > summary::before{transform:rotate(45deg)}
+details.adv[open] > summary{border-bottom:1px solid var(--line-soft);color:var(--text)}
+.adv-body{padding:16px 14px 4px}
+.color-row{display:flex;gap:8px;align-items:center}
+.color-row input[type=color]{
+  width:46px;height:40px;padding:3px;flex:none;cursor:pointer;background:var(--panel);
+}
+
+/* ------------------------------------------------------- regex tester */
+.tester{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:16px;background:var(--panel)}
+.tester-head{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+  border-bottom:1px solid var(--line-soft);background:var(--panel-2);
+}
+.tester-head strong{font-size:13px;font-weight:600;flex:1}
+.tester-body{padding:14px}
+.tester-out{margin-top:12px;font-size:13px}
+.rel{border-top:1px solid var(--line-soft);padding:10px 0;display:grid;gap:5px}
+.rel:first-child{border-top:none;padding-top:0}
+.rel-top{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.rel-tag{font-family:var(--mono);font-size:12.5px;color:var(--text);font-weight:500}
+.rel-date{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.rel-pick{
+  display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11.5px;
+  color:var(--accent);min-width:0;
+}
+.rel-pick .fname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rel-skip{font-size:12px;color:var(--muted);display:flex;gap:7px;align-items:center}
+.rel-skip.cut{color:var(--err)}
+.tick{color:var(--ok);flex:none}
+.cross{color:var(--muted);flex:none}
+
+/* ---------------------------------------------------------------- toast */
+.toasts{
+  position:fixed;z-index:90;left:50%;transform:translateX(-50%);
+  bottom:max(20px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;
+  width:min(440px,calc(100vw - 32px));pointer-events:none;
+}
+.toast{
+  background:var(--panel-2);border:1px solid var(--line);border-left:2px solid var(--accent);
+  border-radius:9px;padding:11px 15px;font-size:13.5px;box-shadow:var(--shadow);
+  animation:rise .2s cubic-bezier(.32,.72,0,1);
+}
+.toast.bad{border-left-color:var(--err)}
+.toast.good{border-left-color:var(--ok)}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}}
+
+/* ---------------------------------------------------------------- dialog */
+.dialog{
+  position:fixed;z-index:80;inset:0;display:grid;place-items:center;padding:20px;
+  opacity:0;pointer-events:none;transition:opacity .18s ease;
+}
+.dialog.on{opacity:1;pointer-events:auto}
+.dialog-card{
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:22px;width:min(400px,100%);box-shadow:var(--shadow);
+}
+.dialog-card h2{margin:0 0 8px;font-size:16px;font-weight:600}
+.dialog-card p{margin:0 0 20px;color:var(--muted);font-size:13.5px;line-height:1.6}
+.dialog-card p b{color:var(--text);font-weight:600}
+.dialog-actions{display:flex;gap:10px;justify-content:flex-end}
+
+/* ---------------------------------------------------------------- mobile */
+/* Grid rather than flex: flex items shrink toward min-content and quietly
+   push the toolbar past the viewport, which widens the whole page. */
+@media (max-width:819px){
+  :root{--pad:16px}
+  .toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;padding:18px 0 12px}
+  .search{grid-column:1/-1}
+  .toolbar .btn{width:100%}
+  /* Primary action gets its own full-width row: better thumb reach than
+     squeezing three buttons into a 390px line. */
+  .toolbar .btn.primary{grid-column:1/-1}
+  .row{grid-template-columns:44px minmax(0,1fr);row-gap:12px;padding-right:10px}
+  .row-actions{grid-column:2;justify-content:flex-start;gap:6px}
+  .btn.icon{padding:9px}          /* comfortable tap target, ~33px */
+  /* Stacked meta: the "/" separators stop meaning anything once it wraps. */
+  .row-meta{flex-direction:column;align-items:flex-start;gap:3px;min-width:0}
+  .row-meta span{max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row-meta .sep{display:none}
+  .urlbar{max-width:100%}
+  .urlbar .scheme{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+}
+
+/* ---------------------------------------------------------------- desktop */
+@media (min-width:820px){
+  .drawer{
+    inset:0 0 0 auto;width:min(600px,94vw);
+    border-radius:0;box-shadow:var(--shadow);
+  }
+  .drawer-head{padding-top:16px}
+  .grid2{grid-template-columns:1fr 1fr}
+  .grid2 .span2{grid-column:1/-1}
+  .row{grid-template-columns:48px minmax(0,1fr) auto auto;padding:16px 8px 16px 20px}
+  .icon{width:48px;height:48px}
+  /* Capped and truncating: an error message can be long, and an `auto` grid
+     column would otherwise widen until it collides with the row actions. */
+  .row-side{display:block;text-align:right;font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap;max-width:210px;min-width:0}
+  .row-side span{display:block;overflow:hidden;text-overflow:ellipsis}
+  .row-side .ver{color:var(--text);font-size:13px;margin-bottom:3px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1 id="repoName" data-i18n="app.title">AltStore Source</h1>
+    </div>
+    <div class="lang" id="langSwitch" role="group" data-i18n-aria="lang.aria">
+      <button type="button" data-lang="en">EN</button>
+      <button type="button" data-lang="zh">中文</button>
+    </div>
+    <div class="urlbar">
+      <span class="scheme" id="urlScheme">https://</span><span class="path" id="urlPath">/source.json</span>
+      <button class="copy" id="copyBtn" data-i18n-title="copy.title">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5.5" y="5.5" width="8" height="9" rx="1.6"/><path d="M10.5 3.5v-1a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h1"/></svg>
+        <span id="copyLabel" data-i18n="copy">Copy</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="toolbar">
+    <div class="search">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3" stroke-linecap="round"/></svg>
+      <input type="search" id="search" data-i18n-ph="search.ph" placeholder="Search apps or repos" autocomplete="off">
+    </div>
+    <button class="btn" id="groupsBtn">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4.5h5M2 8h9M2 11.5h6" stroke-linecap="round"/><circle cx="12.5" cy="4.5" r="1.8"/></svg>
+      <span data-i18n="btn.groups">Groups</span>
+    </button>
+    <button class="btn" id="settingsBtn">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.8M8 12.7v1.8M14.5 8h-1.8M3.3 8H1.5M12.6 3.4l-1.3 1.3M4.7 11.3l-1.3 1.3M12.6 12.6l-1.3-1.3M4.7 4.7 3.4 3.4"/></svg>
+      <span data-i18n="btn.settings">Repo settings</span>
+    </button>
+    <button class="btn primary" id="addBtn">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3.5v9M3.5 8h9" stroke-linecap="round"/></svg>
+      <span data-i18n="btn.add">Add app</span>
+    </button>
+  </div>
+  <div id="list"></div>
+</main>
+
+<div class="scrim" id="scrim"></div>
+
+<!-- app editor -->
+<aside class="drawer" id="appDrawer" role="dialog" aria-modal="true" aria-labelledby="appDrawerTitle">
+  <div class="drawer-head">
+    <h2 id="appDrawerTitle" data-i18n="app.add">Add app</h2>
+    <button class="btn icon" data-close data-i18n-title="btn.close">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 4 8 8M12 4l-8 8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body">
+    <form id="appForm" autocomplete="off">
+      <fieldset>
+        <legend data-i18n="app.section.source">Build source</legend>
+        <div class="field">
+          <label for="f_repo" data-i18n="app.repo">Repository</label>
+          <input id="f_repo" name="repo" placeholder="owner/repo" required>
+          <div class="hint" data-i18n-html="app.repoHint"></div>
+        </div>
+        <div class="field">
+          <label for="f_repoType" data-i18n="app.repoType">Source host</label>
+          <select id="f_repoType" name="repoType"></select>
+          <div class="hint" data-i18n="app.repoTypeHint"></div>
+        </div>
+        <div class="field">
+          <label for="f_assetRegex" data-i18n="app.assetRegex">Asset regex</label>
+          <input id="f_assetRegex" name="assetRegex" class="mono" placeholder="(?i)\.ipa$">
+          <div class="hint" data-i18n-html="app.assetHint"></div>
+        </div>
+        <div class="check-row" id="f_externalWrap" hidden>
+          <label class="check">
+            <input type="checkbox" id="f_includeExternal" name="includeExternal">
+            <span><span data-i18n="app.includeExternal">Include external links</span><small data-i18n="app.includeExternalHint"></small></span>
+          </label>
+        </div>
+
+        <div class="tester">
+          <div class="tester-head">
+            <strong data-i18n="tester.title">Regex tester</strong>
+            <button type="button" class="btn sm" id="testBtn" data-i18n="tester.run">Test</button>
+          </div>
+          <div class="tester-body">
+            <div id="testerOut" class="tester-out">
+              <span style="color:var(--muted)" data-i18n="tester.idle"></span>
+            </div>
+          </div>
+        </div>
+
+        <details class="adv">
+          <summary data-i18n="app.adv.versions">Version extraction</summary>
+          <div class="adv-body">
+            <div class="field">
+              <label for="f_versionRegex" data-i18n="app.versionRegex">Version regex</label>
+              <input id="f_versionRegex" name="versionRegex" class="mono" placeholder="release-(.+)">
+              <div class="hint" data-i18n-html="app.versionRegexHint"></div>
+            </div>
+            <div class="field">
+              <label for="f_maxVersions" data-i18n="app.maxVersions">Versions to keep</label>
+              <input id="f_maxVersions" name="maxVersions" type="number" min="0" placeholder="10">
+              <div class="hint" data-i18n="app.maxVersionsHint"></div>
+            </div>
+            <label class="check">
+              <input type="checkbox" id="f_includePrerelease" name="includePrerelease">
+              <span><span data-i18n="app.includePre">Include pre-releases</span><small data-i18n="app.includePreHint"></small></span>
+            </label>
+          </div>
+        </details>
+      </fieldset>
+
+      <fieldset>
+        <legend data-i18n="app.section.info">App info</legend>
+        <div class="grid2">
+          <div class="field">
+            <label for="f_name" data-i18n="app.name">App name</label>
+            <input id="f_name" name="name" required>
+          </div>
+          <div class="field">
+            <label for="f_bundleIdentifier" data-i18n="app.bundle">Bundle ID</label>
+            <input id="f_bundleIdentifier" name="bundleIdentifier" class="mono" placeholder="com.example.app" required>
+          </div>
+          <div class="field">
+            <label for="f_developerName" data-i18n="app.developer">Developer</label>
+            <input id="f_developerName" name="developerName" data-i18n-ph="app.developerPh">
+          </div>
+          <div class="field">
+            <label for="f_category" data-i18n="app.category">Category</label>
+            <select id="f_category" name="category"></select>
+          </div>
+          <div class="field span2">
+            <label for="f_group" data-i18n="app.group">Group</label>
+            <select id="f_group" name="group"></select>
+            <div class="hint" id="f_groupHint"></div>
+            <!-- Only shown when the app name cannot yield a slug on its own. -->
+            <div class="field" id="f_newGroupSlug" style="margin:12px 0 0" hidden>
+              <label for="f_groupSlug" data-i18n="grp.slug">Group slug</label>
+              <input id="f_groupSlug" class="mono" placeholder="my-app">
+              <div class="hint" data-i18n="group.slugAskHint"></div>
+            </div>
+          </div>
+          <div class="field span2">
+            <label for="f_subtitle" data-i18n="app.subtitle">Subtitle</label>
+            <input id="f_subtitle" name="subtitle" maxlength="60">
+          </div>
+          <div class="field span2">
+            <label for="f_localizedDescription" data-i18n="app.description">Description</label>
+            <textarea id="f_localizedDescription" name="localizedDescription" data-i18n-ph="app.descriptionPh"></textarea>
+          </div>
+          <div class="field span2">
+            <label for="f_iconURL" data-i18n="app.iconURL">Icon URL</label>
+            <input id="f_iconURL" name="iconURL" class="mono" placeholder="https://…/icon.png">
+          </div>
+          <div class="field">
+            <label for="f_tintColor" data-i18n="app.tintColor">Tint colour</label>
+            <div class="color-row">
+              <input type="color" id="f_tintColor_pick" value="#E8B04B">
+              <input id="f_tintColor" name="tintColor" class="mono" placeholder="#E8B04B">
+            </div>
+          </div>
+          <div class="field">
+            <label for="f_minOSVersion" data-i18n="app.minOS">Minimum iOS version</label>
+            <input id="f_minOSVersion" name="minOSVersion" class="mono" placeholder="15.0">
+          </div>
+          <div class="field span2">
+            <label for="f_screenshots" data-i18n="app.screenshots">Screenshot URLs</label>
+            <textarea id="f_screenshots" name="screenshots" class="mono" style="min-height:64px" data-i18n-ph="app.screenshotsPh"></textarea>
+          </div>
+        </div>
+      </fieldset>
+
+      <details class="adv">
+        <summary data-i18n="app.adv.override">Override the newest version</summary>
+        <div class="adv-body">
+          <p class="hint" style="margin:0 0 14px" data-i18n="app.overrideHint"></p>
+          <div class="grid2">
+            <div class="field">
+              <label for="f_versionOverride" data-i18n="app.ovVersion">Version</label>
+              <input id="f_versionOverride" name="versionOverride" class="mono">
+            </div>
+            <div class="field">
+              <label for="f_dateOverride" data-i18n="app.ovDate">Date</label>
+              <input id="f_dateOverride" name="dateOverride" class="mono" placeholder="2026-01-31">
+            </div>
+            <div class="field span2">
+              <label for="f_downloadOverride" data-i18n="app.ovDownload">Download URL</label>
+              <input id="f_downloadOverride" name="downloadOverride" class="mono">
+            </div>
+            <div class="field span2">
+              <label for="f_sizeOverride" data-i18n="app.ovSize">Size (bytes)</label>
+              <input id="f_sizeOverride" name="sizeOverride" type="number" min="0" class="mono">
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <label class="check">
+        <input type="checkbox" id="f_enabled" name="enabled" checked>
+        <span><span data-i18n="app.enabled">Enabled in this source</span><small data-i18n="app.enabledHint"></small></span>
+      </label>
+    </form>
+  </div>
+  <div class="drawer-foot">
+    <button class="btn ghost" id="deleteBtn" data-i18n="btn.delete" hidden>Delete</button>
+    <button class="btn" data-close data-i18n="btn.cancel">Cancel</button>
+    <button class="btn primary" id="saveBtn" data-i18n="btn.save">Save</button>
+  </div>
+</aside>
+
+<!-- repo settings -->
+<aside class="drawer" id="cfgDrawer" role="dialog" aria-modal="true" aria-labelledby="cfgDrawerTitle">
+  <div class="drawer-head">
+    <h2 id="cfgDrawerTitle" data-i18n="cfg.title">Repo settings</h2>
+    <button class="btn icon" data-close data-i18n-title="btn.close">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 4 8 8M12 4l-8 8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body">
+    <form id="cfgForm" autocomplete="off">
+      <fieldset>
+        <legend data-i18n="cfg.section.source">Source info</legend>
+        <div class="grid2">
+          <div class="field span2">
+            <label for="c_name" data-i18n="cfg.name">Source name</label>
+            <input id="c_name" name="name" required>
+          </div>
+          <div class="field span2">
+            <label for="c_identifier" data-i18n="cfg.identifier">Identifier</label>
+            <input id="c_identifier" name="identifier" class="mono" placeholder="com.example.source" required>
+            <div class="hint" data-i18n="cfg.identifierHint"></div>
+          </div>
+          <div class="field span2">
+            <label for="c_subtitle" data-i18n="cfg.subtitle">Subtitle</label>
+            <input id="c_subtitle" name="subtitle" maxlength="60">
+          </div>
+          <div class="field span2">
+            <label for="c_description" data-i18n="cfg.description">Description</label>
+            <textarea id="c_description" name="description"></textarea>
+          </div>
+          <div class="field span2">
+            <label for="c_iconURL" data-i18n="cfg.iconURL">Icon URL</label>
+            <input id="c_iconURL" name="iconURL" class="mono">
+          </div>
+          <div class="field span2">
+            <label for="c_headerURL" data-i18n="cfg.headerURL">Header image URL</label>
+            <input id="c_headerURL" name="headerURL" class="mono">
+          </div>
+          <div class="field">
+            <label for="c_website" data-i18n="cfg.website">Website</label>
+            <input id="c_website" name="website" class="mono">
+          </div>
+          <div class="field">
+            <label for="c_tintColor" data-i18n="cfg.tintColor">Tint colour</label>
+            <div class="color-row">
+              <input type="color" id="c_tintColor_pick" value="#E8B04B">
+              <input id="c_tintColor" name="tintColor" class="mono">
+            </div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend data-i18n="cfg.section.github">GitHub API</legend>
+        <div class="field">
+          <label for="c_githubToken" data-i18n="cfg.token">Personal Access Token</label>
+          <input id="c_githubToken" name="githubToken" type="password" class="mono" data-i18n-ph="cfg.tokenPh">
+          <div class="hint" data-i18n-html="cfg.tokenHint"></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend data-i18n="cfg.section.starforge">Starforge (starforgejo.dev)</legend>
+        <div class="field">
+          <label for="c_starforgeToken" data-i18n="cfg.starforgeToken">Access Token</label>
+          <input id="c_starforgeToken" name="starforgeToken" type="password" class="mono" data-i18n-ph="cfg.starforgeTokenPh">
+          <div class="hint" data-i18n-html="cfg.starforgeTokenHint"></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend data-i18n="cfg.section.cache">Cache</legend>
+        <div class="field">
+          <label for="c_cacheTTL" data-i18n="cfg.cacheTTL">Cache time (seconds)</label>
+          <input id="c_cacheTTL" name="cacheTTL" type="number" min="30" value="300">
+          <div class="hint" data-i18n="cfg.cacheHint"></div>
+        </div>
+      </fieldset>
+    </form>
+  </div>
+  <div class="drawer-foot">
+    <button class="btn" data-close data-i18n="btn.cancel">Cancel</button>
+    <button class="btn primary" id="cfgSaveBtn" data-i18n="btn.save">Save</button>
+  </div>
+</aside>
+
+<!-- group management -->
+<aside class="drawer" id="grpDrawer" role="dialog" aria-modal="true" aria-labelledby="grpTitle">
+  <div class="drawer-head">
+    <button class="btn icon" id="grpBack" data-i18n-title="btn.back" hidden>
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 3.5 5.5 8l4.5 4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <h2 id="grpTitle" data-i18n="grp.title">Groups</h2>
+    <button class="btn icon" data-close data-i18n-title="btn.close">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 4 8 8M12 4l-8 8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body">
+
+    <div id="grpListView">
+      <p class="hint" style="margin:0 0 18px" data-i18n-html="grp.intro"></p>
+      <div id="grpList"></div>
+      <button class="btn primary" id="grpNewBtn" style="width:100%;margin-top:18px">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3.5v9M3.5 8h9" stroke-linecap="round"/></svg>
+        <span data-i18n="grp.new">New group</span>
+      </button>
+    </div>
+
+    <div id="grpFormView" hidden>
+      <form id="grpForm" autocomplete="off">
+        <fieldset>
+          <legend data-i18n="grp.section">Group</legend>
+          <div class="field">
+            <label for="g_slug" data-i18n="grp.slug">Group slug</label>
+            <input id="g_slug" name="slug" class="mono" placeholder="utm" required>
+            <div class="hint"><span data-i18n-html="grp.slugHint"></span> <code id="g_urlPreview">/source/utm.json</code></div>
+          </div>
+          <div class="field">
+            <label for="g_name" data-i18n="grp.name">Name</label>
+            <input id="g_name" name="name" data-i18n-ph="grp.namePh">
+          </div>
+          <div class="field">
+            <label for="g_identifier" data-i18n="grp.identifier">Identifier</label>
+            <input id="g_identifier" name="identifier" class="mono" data-i18n-ph="grp.identifierPh">
+            <div class="hint" data-i18n="grp.identifierHint"></div>
+          </div>
+        </fieldset>
+
+        <details class="adv">
+          <summary data-i18n="grp.adv.appearance">Appearance (empty inherits the source)</summary>
+          <div class="adv-body">
+            <div class="field">
+              <label for="g_subtitle" data-i18n="cfg.subtitle">Subtitle</label>
+              <input id="g_subtitle" name="subtitle" maxlength="60">
+            </div>
+            <div class="field">
+              <label for="g_description" data-i18n="cfg.description">Description</label>
+              <textarea id="g_description" name="description"></textarea>
+            </div>
+            <div class="field">
+              <label for="g_iconURL" data-i18n="cfg.iconURL">Icon URL</label>
+              <input id="g_iconURL" name="iconURL" class="mono">
+            </div>
+            <div class="field">
+              <label for="g_headerURL" data-i18n="cfg.headerURL">Header image URL</label>
+              <input id="g_headerURL" name="headerURL" class="mono">
+            </div>
+            <div class="field">
+              <label for="g_website" data-i18n="cfg.website">Website</label>
+              <input id="g_website" name="website" class="mono">
+            </div>
+            <div class="field">
+              <label for="g_tintColor" data-i18n="cfg.tintColor">Tint colour</label>
+              <div class="color-row">
+                <input type="color" id="g_tintColor_pick" value="#E8B04B">
+                <input id="g_tintColor" name="tintColor" class="mono" placeholder="#E8B04B">
+              </div>
+            </div>
+          </div>
+        </details>
+      </form>
+    </div>
+
+  </div>
+  <div class="drawer-foot">
+    <button class="btn ghost" id="grpDeleteBtn" data-i18n="btn.delete" hidden>Delete</button>
+    <button class="btn" id="grpCloseBtn" data-close data-i18n="btn.close">Close</button>
+    <button class="btn" id="grpCancelBtn" data-i18n="btn.cancel" hidden>Cancel</button>
+    <button class="btn primary" id="grpSaveBtn" data-i18n="btn.save" hidden>Save</button>
+  </div>
+</aside>
+
+<div class="dialog" id="confirm">
+  <div class="dialog-card">
+    <h2 id="confirmTitle" data-i18n="confirm.title">Are you sure?</h2>
+    <p id="confirmBody"></p>
+    <div class="dialog-actions">
+      <button class="btn" id="confirmNo" data-i18n="confirm.no">Cancel</button>
+      <button class="btn danger" id="confirmYes" data-i18n="confirm.yes">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="/static/i18n.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const listEl = $("list");
+
+const state = { apps: [], cfg: null, editing: null, filter: "", groups: [], counts: {}, editingGroup: null,
+                sites: [], defaultSite: "" };
+
+/* ------------------------------------------------------------ i18n core */
+const LANG_KEY = "altstore-repo.lang";
+let LANG = "en";   // English is the product default; a saved choice wins.
+try{
+  const saved = localStorage.getItem(LANG_KEY);
+  if(saved && I18N[saved]) LANG = saved;
+}catch{ /* private mode: keep the default */ }
+// ?lang=zh makes a specific language linkable and is treated as a choice.
+try{
+  const q = new URLSearchParams(location.search).get("lang");
+  if(q && I18N[q]){ LANG = q; localStorage.setItem(LANG_KEY, q); }
+}catch{ /* ignore */ }
+
+// t() interpolates {0}, {1} … Callers that pass user data into an -html
+// string must escape it first; see the esc() calls at those sites.
+function t(key, ...args){
+  const s = (I18N[LANG] && I18N[LANG][key]) ?? I18N.en[key] ?? key;
+  return args.length ? s.replace(/\{(\d+)\}/g, (m, i) => (args[i] ?? m)) : s;
+}
+
+// Fills every [data-i18n*] node under root. Translatable text lives in the
+// dictionary; technical placeholders like owner/repo stay in the markup.
+function applyI18n(root = document){
+  root.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  root.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+  root.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+  root.querySelectorAll("[data-i18n-title]").forEach(el => { el.title = t(el.dataset.i18nTitle); });
+  root.querySelectorAll("[data-i18n-aria]").forEach(el => { el.setAttribute("aria-label", t(el.dataset.i18nAria)); });
+}
+
+function setLang(next){
+  if(!I18N[next] || next === LANG) return;
+  LANG = next;
+  try{ localStorage.setItem(LANG_KEY, next); }catch{ /* ignore */ }
+  document.documentElement.lang = next === "zh" ? "zh-CN" : "en";
+  document.querySelectorAll("#langSwitch button").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.lang === next)));
+  applyI18n();
+  fillCategorySelect();
+  fillGroupSelect($("f_group").value);
+  applyConfig();
+  render();
+  renderGroups();
+  // Drawer headings are set from JS rather than data-i18n, so they need a nudge.
+  if(openDrawer === $("appDrawer"))
+    $("appDrawerTitle").textContent = state.editing ? t("app.edit") : t("app.add");
+  if(openDrawer === $("grpDrawer"))
+    $("grpTitle").textContent = $("grpListView").hidden
+      ? (state.editingGroup ? t("grp.edit") : t("grp.new")) : t("grp.title");
+  // The tester output is generated markup, so it is re-rendered rather than
+  // translated in place; lastTest is whatever the tester last produced.
+  if(lastTest) renderTest(lastTest);
+}
+
+document.querySelectorAll("#langSwitch button").forEach(b =>
+  b.addEventListener("click", () => setLang(b.dataset.lang)));
+
+/* ------------------------------------------------------------- helpers */
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function fmtSize(b){
+  if(!b || b < 0) return "—";
+  const u = ["B","KB","MB","GB"]; let n = b, i = 0;
+  while(n >= 1024 && i < u.length-1){ n /= 1024; i++; }
+  return (i === 0 ? n : n.toFixed(n < 10 ? 2 : 1)) + " " + u[i];
+}
+
+function fmtDate(iso){
+  if(!iso) return "—";
+  const d = new Date(iso);
+  if(isNaN(d)) return iso;
+  const days = Math.floor((Date.now() - d) / 86400000);
+  if(days <= 0) return t("date.today");
+  if(days === 1) return t("date.yesterday");
+  if(days < 30) return t("date.daysAgo", days);
+  if(days < 365) return t("date.monthsAgo", Math.floor(days/30));
+  return t("date.yearsAgo", Math.floor(days/365));
+}
+
+const absDate = iso => {
+  const d = new Date(iso);
+  if(isNaN(d)) return iso || "—";
+  return d.toLocaleString(DATE_LOCALE[LANG] || "en-US",
+    {year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
+};
+
+async function api(path, opts = {}){
+  const res = await fetch(path, {
+    headers: {"Content-Type":"application/json", "Accept-Language": LANG},
+    ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON error page */ }
+  if(!res.ok) throw new Error((data && data.error) || text || ("HTTP " + res.status));
+  return data;
+}
+
+function toast(msg, kind = ""){
+  const el = document.createElement("div");
+  el.className = "toast " + kind;
+  el.textContent = msg;
+  $("toasts").appendChild(el);
+  setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity .25s"; }, 3200);
+  setTimeout(() => el.remove(), 3600);
+}
+
+function fillCategorySelect(){
+  const sel = $("f_category");
+  const cur = sel.value;
+  sel.innerHTML = `<option value="">${esc(t("app.category.none"))}</option>` +
+    Object.keys(CATEGORY_LABEL).map(k => `<option value="${k}">${esc(CATEGORY_LABEL[k])}</option>`).join("");
+  sel.value = cur;
+}
+
+/* ------------------------------------------------------------ app list */
+function visibleApps(){
+  const q = state.filter.trim().toLowerCase();
+  if(!q) return state.apps;
+  return state.apps.filter(a =>
+    (a.name||"").toLowerCase().includes(q) ||
+    (a.repo||"").toLowerCase().includes(q) ||
+    (a.bundleIdentifier||"").toLowerCase().includes(q));
+}
+
+function render(){
+  const apps = visibleApps();
+  if(!state.apps.length){
+    listEl.className = "";
+    listEl.innerHTML = `<div class="empty">
+      <h2>${esc(t("list.empty.title"))}</h2>
+      <p>${esc(t("list.empty.body"))}</p>
+      <button class="btn primary" onclick="openApp()">${esc(t("list.empty.cta"))}</button>
+    </div>`;
+    return;
+  }
+  if(!apps.length){
+    listEl.className = "";
+    listEl.innerHTML = `<div class="empty">
+      <h2>${esc(t("list.noresult.title"))}</h2><p>${esc(t("list.noresult.body"))}</p>
+    </div>`;
+    return;
+  }
+  listEl.className = "list";
+  listEl.innerHTML = apps.map(a => {
+    const tint = a.tintColor || "#E8B04B";
+    const host = shownHost(a.repoType);
+    const initial = (a.name || a.repo || "?").trim().charAt(0).toUpperCase();
+    const icon = a.iconURL
+      ? `<img class="icon" src="${esc(a.iconURL)}" alt="" loading="lazy" data-initial="${esc(initial)}">`
+      : `<div class="icon mono-face">${esc(initial)}</div>`;
+    return `<article class="row ${a.enabled ? "" : "off"}" style="--tint:${esc(tint)}">
+      ${icon}
+      <div class="row-main">
+        <div class="row-title">
+          <h3>${esc(a.name || a.repo)}</h3>
+          ${a.enabled ? "" : `<span class="pill quiet">${esc(t("row.disabled"))}</span>`}
+          ${a.group ? `<span class="pill" title="${esc(t("row.groupTitle", a.group))}">${esc(a.group)}</span>` : ""}
+          ${a.category ? `<span class="pill quiet">${esc(CATEGORY_LABEL[a.category] || a.category)}</span>` : ""}
+        </div>
+        <div class="row-meta">
+          <span>${esc(a.bundleIdentifier || t("row.noBundle"))}</span>
+          <span class="sep">/</span>
+          <span>${esc(a.repo)}</span>
+          ${host ? `<span class="sep">/</span><span>${esc(host)}</span>` : ""}
+          ${a.includePrerelease ? `<span class="sep">/</span><span>${esc(t("row.prerelease"))}</span>` : ""}
+        </div>
+      </div>
+      <div class="row-side" data-ver="${esc(a.id)}"><span class="ver">…</span><span>${esc(t("row.loading"))}</span></div>
+      <div class="row-actions">
+        <button class="btn sm" onclick="openApp('${a.id}')">${esc(t("row.edit"))}</button>
+      </div>
+    </article>`;
+  }).join("");
+  // A broken icon URL should degrade to the monogram, not a torn-image glyph.
+  listEl.querySelectorAll("img.icon").forEach(img => {
+    img.addEventListener("error", () => {
+      const d = document.createElement("div");
+      d.className = "icon mono-face";
+      d.textContent = img.dataset.initial || "?";
+      img.replaceWith(d);
+    }, {once:true});
+  });
+  apps.forEach(a => loadVersionBadge(a.id));
+}
+
+// Each row shows its newest version, but one request per app on every render
+// would be wasteful, so results are memoised for the session.
+const badgeCache = new Map();
+async function loadVersionBadge(id){
+  const el = document.querySelector(`[data-ver="${id}"]`);
+  if(!el) return;
+  if(badgeCache.has(id)){
+    const c = badgeCache.get(id);
+    el.innerHTML = c.error
+      ? `<span class="ver" style="color:var(--err)">${esc(t("row.loadFailed"))}</span><span title="${esc(c.error)}">${esc(c.error)}</span>`
+      : `<span class="ver">v${esc(c.version)}</span><span>${fmtSize(c.size)} · ${esc(fmtDate(c.date))}</span>`;
+    return;
+  }
+  try{
+    const res = await api(`/api/apps/${id}/versions`);
+    const v = res.versions && res.versions[0];
+    const c = v ? {version:v.version,size:v.size,date:v.date} : {error:t("row.noVersions")};
+    badgeCache.set(id, c);
+    loadVersionBadge(id);
+  }catch(e){
+    badgeCache.set(id, {error: e.message.slice(0, 40)});
+    loadVersionBadge(id);
+  }
+}
+
+/* --------------------------------------------------------------- drawer */
+let openDrawer = null;
+function showDrawer(el){
+  closeDrawer();
+  openDrawer = el;
+  el.classList.add("on");
+  $("scrim").classList.add("on");
+  document.body.style.overflow = "hidden";
+  const focusable = el.querySelector("input,select,textarea");
+  if(focusable) setTimeout(() => focusable.focus(), 60);
+}
+function closeDrawer(){
+  if(!openDrawer) return;
+  openDrawer.classList.remove("on");
+  openDrawer = null;
+  $("scrim").classList.remove("on");
+  document.body.style.overflow = "";
+}
+document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeDrawer));
+$("scrim").addEventListener("click", closeDrawer);
+document.addEventListener("keydown", e => { if(e.key === "Escape") closeDrawer(); });
+
+/* ------------------------------------------------------------ app form */
+// The host list comes from /api/sites, which is built from repoHosts in
+// hosts.go — one table, no second copy here. state.sites is [{id,label,domain,
+// dialect}] and state.defaultSite is the id a bare owner/repo means.
+//
+// The picker shows "Label (domain)", the app row shows the domain of anything
+// that is not the default, and the external-links switch belongs to the hosts
+// that can tell an uploaded file from a link to another site, which is the
+// Forgejo dialect.
+function siteByID(id){ return (state.sites || []).find(s => s.id === (id || state.defaultSite)); }
+function hostLabel(s){ return `${s.label} (${s.domain})`; }
+// The domain is worth a line in the app row only when it is not the default.
+function shownHost(id){
+  const s = siteByID(id);
+  return s && s.id !== state.defaultSite ? s.domain : "";
+}
+
+// Runs after setForm: an app with no repoType of its own — a new one, or one
+// whose value the select has no option for — would otherwise leave the picker
+// blank, because setting a select's value to something it does not offer clears
+// the selection. The default comes from the server, not from whatever the last
+// form left behind.
+function fillRepoTypeSelect(selected){
+  const sel = $("f_repoType");
+  const want = selected || state.defaultSite;
+  sel.innerHTML = "";
+  (state.sites || []).forEach(s => sel.add(new Option(hostLabel(s), s.id, false, s.id === want)));
+  // A stored id that is no longer in the table stays visible instead of the
+  // picker silently showing a different host; saving then reports it.
+  if(want && !sel.value) sel.add(new Option(want, want, true, true));
+}
+
+function setForm(form, data){
+  for(const el of form.elements){
+    if(!el.name) continue;
+    const v = data[el.name];
+    if(el.type === "checkbox") el.checked = !!v;
+    else if(el.name === "screenshots") el.value = (v || []).join("\n");
+    else el.value = v ?? "";
+  }
+}
+
+function getForm(form){
+  const out = {};
+  for(const el of form.elements){
+    if(!el.name) continue;
+    if(el.type === "checkbox") out[el.name] = el.checked;
+    else if(el.type === "number") out[el.name] = el.value === "" ? 0 : Number(el.value);
+    else if(el.name === "screenshots") out[el.name] = el.value.split("\n").map(s => s.trim()).filter(Boolean);
+    else out[el.name] = el.value.trim();
+  }
+  return out;
+}
+
+window.openApp = function(id){
+  const app = id ? state.apps.find(a => a.id === id) : null;
+  state.editing = id || null;
+  $("appDrawerTitle").textContent = app ? t("app.edit") : t("app.add");
+  $("deleteBtn").hidden = !app;
+  $("appForm").reset();
+  setForm($("appForm"), app || {enabled:true, maxVersions:10});
+  fillRepoTypeSelect(app && app.repoType);
+  fillGroupSelect(app ? app.group : "");
+  toggleExternal();
+  $("f_tintColor_pick").value = (app && app.tintColor) || "#E8B04B";
+  $("testerOut").innerHTML = `<span style="color:var(--muted)">${esc(t("tester.idle"))}</span>`;
+  showDrawer($("appDrawer"));
+};
+
+$("addBtn").addEventListener("click", () => openApp());
+$("f_tintColor_pick").addEventListener("input", e => $("f_tintColor").value = e.target.value);
+
+// Pasting a link settles the host, so the dropdown can never contradict what
+// the server resolves out of the repo box.
+$("f_repo").addEventListener("input", () => {
+  const v = $("f_repo").value.toLowerCase();
+  const hit = (state.sites || []).find(s => v.includes(s.domain));
+  if(hit) $("f_repoType").value = hit.id;
+  toggleExternal();
+});
+$("f_repoType").addEventListener("change", toggleExternal);
+
+// Whether a release links its files to another host is something only some
+// hosts report, so the switch is hidden where it means nothing.
+function toggleExternal(){
+  const site = siteByID($("f_repoType").value);
+  $("f_externalWrap").hidden = !site || site.dialect !== "forgejo";
+}
+$("c_tintColor_pick").addEventListener("input", e => $("c_tintColor").value = e.target.value);
+
+$("saveBtn").addEventListener("click", async () => {
+  const form = $("appForm");
+  if(!form.reportValidity()) return;
+  const body = getForm(form);
+  // "New group…" in the picker: build the group before anything is written, so
+  // a slug the server would refuse stops the save here instead of leaving a
+  // group behind and no app. The group itself is created first, so a clash on
+  // its name or slug fails the whole save.
+  const newGroup = body.group === NEW_GROUP ? groupFromApp(body, $("f_groupSlug").value) : null;
+  if(newGroup && !slugUsable(newGroup.slug)){
+    toast(t("group.slugInvalid"), "bad");
+    $("f_groupSlug").focus();
+    return;
+  }
+  const btn = $("saveBtn");
+  btn.disabled = true; btn.textContent = t("btn.saving");
+  try{
+    let made = null;
+    if(newGroup){
+      made = await api("/api/groups", {method:"POST", body: newGroup});
+      body.group = made.slug;
+      await loadGroups();
+      fillGroupSelect(made.slug);
+    }
+    if(state.editing) await api(`/api/apps/${state.editing}`, {method:"PUT", body});
+    else await api("/api/apps", {method:"POST", body});
+    badgeCache.clear();
+    toast(made ? t("toast.groupCreated", made.slug) : t("toast.saved"), "good");
+    closeDrawer();
+    await refresh();
+  }catch(e){
+    toast(e.message, "bad");
+  }finally{
+    btn.disabled = false; btn.textContent = t("btn.save");
+  }
+});
+
+$("deleteBtn").addEventListener("click", async () => {
+  const app = state.apps.find(a => a.id === state.editing);
+  if(!app) return;
+  const ok = await confirmDialog(t("app.delete.title"),
+    t("app.delete.body", `<b>${esc(app.name || app.repo)}</b>`));
+  if(!ok) return;
+  try{
+    await api(`/api/apps/${app.id}`, {method:"DELETE"});
+    badgeCache.clear();
+    toast(t("toast.deleted"));
+    closeDrawer();
+    await refresh();
+  }catch(e){ toast(e.message, "bad"); }
+});
+
+/* -------------------------------------------------------- regex tester */
+let testSeq = 0;
+let lastTest = null;   // kept so the tester can re-render on a language switch
+$("testBtn").addEventListener("click", runTest);
+["f_repo","f_assetRegex","f_versionRegex"].forEach(id =>
+  $(id).addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); runTest(); } }));
+
+async function runTest(force){
+  const repo = $("f_repo").value.trim();
+  if(!repo){ toast(t("tester.needRepo"), "bad"); $("f_repo").focus(); return; }
+  const out = $("testerOut");
+  const seq = ++testSeq;
+  out.innerHTML = `<div class="loading"><span class="spin"></span>${esc(t("tester.running"))}</div>`;
+  $("testBtn").disabled = true;
+  try{
+    const res = await api("/api/resolve", {method:"POST", body:{
+      repo,
+      repoType: $("f_repoType").value,
+      assetRegex: $("f_assetRegex").value.trim(),
+      versionRegex: $("f_versionRegex").value.trim(),
+      includePrerelease: $("f_includePrerelease").checked,
+      includeExternal: $("f_includeExternal").checked,
+      maxVersions: 0,
+      force: !!force,
+    }});
+    if(seq !== testSeq) return;
+    lastTest = res;
+    renderTest(res);
+  }catch(e){
+    if(seq !== testSeq) return;
+    lastTest = null;
+    out.innerHTML = `<div class="note bad"><span>${esc(e.message)}</span></div>`;
+  }finally{
+    if(seq === testSeq) $("testBtn").disabled = false;
+  }
+}
+
+function renderTest(res){
+  const out = $("testerOut");
+  const n = res.versions.length;
+  const scanned = res.preview.length;
+
+  let html = `<div class="note" style="margin-bottom:12px"><span>` + (n
+    ? t("tester.summary", scanned, n,
+        esc(res.versions[0].version), esc(res.versions[0].assetName),
+        fmtSize(res.versions[0].size))
+    : t("tester.summaryNone", scanned)) + `</span></div>`;
+
+  if(res.warnings && res.warnings.length){
+    html += res.warnings.map(w => `<div class="note bad" style="margin-bottom:12px"><span>${esc(w)}</span></div>`).join("");
+  }
+
+  const rows = res.preview.slice(0, 8);
+  if(rows.length){
+    html += '<div style="margin-top:14px">';
+    for(const r of rows){
+      const tick = '<svg class="tick" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      const cross = '<svg class="cross" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5l6 6M11 5l-6 6" stroke-linecap="round"/></svg>';
+      html += `<div class="rel">
+        <div class="rel-top">
+          <span class="rel-tag">${esc(r.tagName || r.releaseName || t("tester.noTag"))}</span>
+          ${r.prerelease ? `<span class="pill quiet">${esc(t("tester.prerelease"))}</span>` : ""}
+          <span class="rel-date" title="${esc(t("tester.dateTitle", absDate(r.publishedAt)))}">${esc(absDate(r.date))}</span>
+        </div>`;
+      if(r.skipped){
+        const extra = r.assets.length ? " — " + t("tester.assetsCount", r.assets.length) : "";
+        html += `<div class="rel-skip cut">${cross}<span>${esc(t("tester.skipped", r.skipped) + extra)}</span></div>`;
+      }else{
+        html += `<div class="rel-pick">${tick}<span class="fname">${esc(r.selected)}</span><span style="color:var(--muted)">v${esc(r.version)} · ${fmtSize(r.size)}</span></div>`;
+        if(r.matched.length > 1){
+          html += `<div class="rel-skip" style="padding-left:20px"><span>${esc(t("tester.moreMatched", r.matched.length-1))}</span></div>`;
+        }
+      }
+      html += "</div>";
+    }
+    if(res.preview.length > rows.length){
+      html += `<div class="rel-skip" style="padding-top:10px"><span>${esc(t("tester.more", res.preview.length - rows.length))}</span></div>`;
+    }
+    html += "</div>";
+  }
+  out.innerHTML = html;
+}
+
+/* --------------------------------------------------------- repo config */
+$("settingsBtn").addEventListener("click", () => {
+  if(!state.cfg) return;
+  $("cfgForm").reset();
+  setForm($("cfgForm"), state.cfg);
+  $("c_tintColor_pick").value = state.cfg.tintColor || "#E8B04B";
+  showDrawer($("cfgDrawer"));
+});
+
+$("cfgSaveBtn").addEventListener("click", async () => {
+  const form = $("cfgForm");
+  if(!form.reportValidity()) return;
+  const btn = $("cfgSaveBtn");
+  btn.disabled = true; btn.textContent = t("btn.saving");
+  try{
+    state.cfg = await api("/api/config", {method:"PUT", body: getForm(form)});
+    badgeCache.clear();
+    applyConfig();
+    toast(t("cfg.saved"), "good");
+    closeDrawer();
+    refresh();
+  }catch(e){
+    toast(e.message, "bad");
+  }finally{
+    btn.disabled = false; btn.textContent = t("btn.save");
+  }
+});
+
+function applyConfig(){
+  const c = state.cfg || {};
+  const name = c.name || t("app.title");
+  $("repoName").textContent = name;
+  document.title = t("app.docTitle", name);
+}
+
+/* --------------------------------------------------------------- groups */
+// Sentinel for "make a group out of this app" in the app form's picker. The
+// server's slug normaliser strips "+", so no real group slug can equal it.
+const NEW_GROUP = "+new";
+
+function fillGroupSelect(selected){
+  const sel = $("f_group");
+  sel.innerHTML = `<option value="">${esc(t("group.none"))}</option>` +
+    state.groups.map(g =>
+      `<option value="${esc(g.slug)}">${esc(g.name || g.slug)} — /source/${esc(g.slug)}.json</option>`
+    ).join("") +
+    `<option value="${NEW_GROUP}">+ ${esc(t("group.newOption"))}</option>`;
+  sel.value = selected || "";
+  updateGroupHint();
+}
+
+// Mirrors the server's slug rule (store.go normalizeSlug): a-z, 0-9 and _ pass
+// through, "-", space and "." collapse into a single dash, everything else is
+// dropped. A name that leaves nothing — 中文 ones, say — slugs to "", and the
+// form then asks for one by hand. The server has the last word either way.
+function derivedSlug(name){
+  let out = "", dash = false;
+  for(const ch of name.trim().toLowerCase()){
+    if((ch >= "a" && ch <= "z") || (ch >= "0" && ch <= "9") || ch === "_"){
+      out += ch; dash = false;
+    }else if(ch === "-" || ch === " " || ch === "."){
+      if(out && !dash){ out += "-"; dash = true; }
+    }
+  }
+  return out.replace(/^-+|-+$/g, "");
+}
+
+// What AddGroup turns down on top of that: the reserved "all" and anything
+// over 64 characters.
+const slugUsable = s => s !== "" && s !== "all" && s.length <= 64;
+
+// The group a "New group…" pick produces: named after the app, carrying the
+// appearance the app already has. The identifier stays empty so the server
+// derives it from the slug. The slug comes from the name, or from the box the
+// form shows when the name cannot supply one.
+function groupFromApp(app, typedSlug){
+  const auto = derivedSlug(app.name);
+  return {
+    slug: slugUsable(auto) ? auto : derivedSlug(typedSlug),
+    name: app.name,
+    identifier: "",
+    subtitle: app.subtitle || "",
+    description: app.localizedDescription || "",
+    iconURL: app.iconURL || "",
+    tintColor: app.tintColor || "",
+  };
+}
+
+function updateGroupHint(){
+  const picked = $("f_group").value;
+  if(picked !== NEW_GROUP){
+    $("f_newGroupSlug").hidden = true;
+    $("f_groupHint").innerHTML = picked
+      ? t("group.hintIn", `<code>${esc(picked)}</code>`)
+      : t("group.hintOut");
+    return;
+  }
+  const name = $("f_name").value.trim();
+  const auto = derivedSlug(name);
+  // With no name yet there is nothing to derive from, so wait for one instead
+  // of asking for a slug the name may well supply.
+  $("f_newGroupSlug").hidden = !name || slugUsable(auto);
+  $("f_groupHint").innerHTML = !name
+    ? t("group.hintNewPending")
+    : slugUsable(auto)
+      ? t("group.hintNew", `<b>${esc(name)}</b>`, `<code>${esc(auto)}</code>`)
+      : t("group.hintNeedSlug");
+}
+
+function showGroupView(which){
+  const list = which === "list";
+  $("grpListView").hidden = !list;
+  $("grpFormView").hidden = list;
+  $("grpBack").hidden = list;
+  $("grpCloseBtn").hidden = !list;
+  $("grpCancelBtn").hidden = list;
+  $("grpSaveBtn").hidden = list;
+  $("grpDeleteBtn").hidden = list || !state.editingGroup;
+  $("grpTitle").textContent = list ? t("grp.title") : (state.editingGroup ? t("grp.edit") : t("grp.new"));
+}
+
+function renderGroups(){
+  const el = $("grpList");
+  if(!state.groups.length){
+    el.className = "";
+    el.innerHTML = `<div class="empty" style="padding:36px 20px;margin:0">
+      <h2>${esc(t("grp.empty.title"))}</h2>
+      <p>${t("grp.empty.body")}</p>
+    </div>`;
+    return;
+  }
+  el.className = "glist";
+  const ungrouped = state.apps.filter(a => !a.group).length;
+  el.innerHTML = state.groups.map(g => {
+    const n = state.counts[g.slug] || 0;
+    return `<div class="gitem" style="--tint:${esc(g.tintColor || "#8A6A2E")}">
+      <div>
+        <div class="gname">${esc(g.name || g.slug)}</div>
+        <div class="gurl">/source/${esc(g.slug)}.json</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="gcount ${n ? "" : "zero"}">${esc(t("grp.count", n))}</span>
+        <button class="copy" type="button" title="${esc(t("copy.title"))}"
+          onclick="copyGroupFeed('${esc(g.slug)}', this)"><span>${esc(t("copy"))}</span></button>
+        <button class="btn sm" onclick="openGroupForm('${esc(g.slug)}')">${esc(t("row.edit"))}</button>
+      </div>
+    </div>`;
+  }).join("") + (ungrouped ? `<div class="gitem loose">
+      <div>
+        <div class="gname" style="color:var(--muted)">${esc(t("grp.ungrouped"))}</div>
+        <div class="gurl" style="color:var(--muted)">${esc(t("grp.ungrouped.url"))}</div>
+      </div>
+      <span class="gcount">${esc(t("grp.count", ungrouped))}</span>
+    </div>` : "");
+}
+
+window.openGroupForm = function(slug){
+  const g = slug ? state.groups.find(x => x.slug === slug) : null;
+  state.editingGroup = slug || null;
+  $("grpForm").reset();
+  setForm($("grpForm"), g || {});
+  if(g){
+    $("g_slug").value = g.slug;
+    // The slug is the group's identity: every app points at it by name.
+    $("g_slug").readOnly = true;
+    $("g_slug").style.opacity = ".6";
+  }else{
+    $("g_slug").readOnly = false;
+    $("g_slug").style.opacity = "";
+  }
+  $("g_tintColor_pick").value = (g && g.tintColor) || "#E8B04B";
+  updateGroupURL();
+  showGroupView("form");
+  if(!g) setTimeout(() => $("g_slug").focus(), 60);
+};
+
+function updateGroupURL(){
+  const v = $("g_slug").value.trim().toLowerCase() || "utm";
+  $("g_urlPreview").textContent = "/source/" + v + ".json";
+}
+
+$("groupsBtn").addEventListener("click", () => {
+  showGroupView("list");
+  renderGroups();
+  showDrawer($("grpDrawer"));
+});
+$("grpBack").addEventListener("click", () => { showGroupView("list"); renderGroups(); });
+$("grpCancelBtn").addEventListener("click", () => { showGroupView("list"); renderGroups(); });
+$("grpNewBtn").addEventListener("click", () => openGroupForm(null));
+$("g_slug").addEventListener("input", updateGroupURL);
+$("g_tintColor_pick").addEventListener("input", e => $("g_tintColor").value = e.target.value);
+$("f_group").addEventListener("change", () => {
+  const wasHidden = $("f_newGroupSlug").hidden;
+  updateGroupHint();
+  // Picking the option is when the box becomes relevant; typing a name is not,
+  // so only this path moves focus — otherwise it would steal keystrokes.
+  if(wasHidden && !$("f_newGroupSlug").hidden) $("f_groupSlug").focus();
+});
+// The new group is named after the app, so the hint follows the name field too.
+$("f_name").addEventListener("input", updateGroupHint);
+
+$("grpSaveBtn").addEventListener("click", async () => {
+  const form = $("grpForm");
+  if(!form.reportValidity()) return;
+  const body = getForm(form);
+  const btn = $("grpSaveBtn");
+  btn.disabled = true; btn.textContent = t("btn.saving");
+  try{
+    if(state.editingGroup) await api(`/api/groups/${encodeURIComponent(state.editingGroup)}`, {method:"PUT", body});
+    else await api("/api/groups", {method:"POST", body});
+    await loadGroups();
+    toast(t("toast.saved"), "good");
+    showGroupView("list");
+    renderGroups();
+    render();
+  }catch(e){
+    toast(e.message, "bad");
+  }finally{
+    btn.disabled = false; btn.textContent = t("btn.save");
+  }
+});
+
+$("grpDeleteBtn").addEventListener("click", async () => {
+  const g = state.groups.find(x => x.slug === state.editingGroup);
+  if(!g) return;
+  const n = state.counts[g.slug] || 0;
+  const name = `<b>${esc(g.name || g.slug)}</b>`;
+  const ok = await confirmDialog(t("grp.delete.title"),
+    n ? t("grp.delete.bodyWith", name, n) : t("grp.delete.bodyPlain", name));
+  if(!ok) return;
+  try{
+    await api(`/api/groups/${encodeURIComponent(g.slug)}`, {method:"DELETE"});
+    await loadGroups();
+    toast(t("toast.deleted"), "good");
+    showGroupView("list");
+    renderGroups();
+    await refresh();
+    render();
+  }catch(e){ toast(e.message, "bad"); }
+});
+
+async function loadGroups(){
+  const res = await api("/api/groups");
+  state.groups = res.groups || [];
+  state.counts = res.counts || {};
+}
+
+/* -------------------------------------------------------------- confirm */
+let confirmResolve = null;
+function confirmDialog(title, body){
+  $("confirmTitle").textContent = title;
+  $("confirmBody").innerHTML = body;
+  $("confirm").classList.add("on");
+  return new Promise(res => { confirmResolve = res; });
+}
+$("confirmNo").addEventListener("click", () => { $("confirm").classList.remove("on"); confirmResolve && confirmResolve(false); });
+$("confirmYes").addEventListener("click", () => { $("confirm").classList.remove("on"); confirmResolve && confirmResolve(true); });
+
+/* ----------------------------------------------------------------- copy */
+// Clipboard API needs a secure context; fall back for plain-HTTP LAN access.
+async function copyText(text){
+  try{
+    await navigator.clipboard.writeText(text);
+    return true;
+  }catch{
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    let ok = true;
+    try{ ok = document.execCommand("copy"); }catch{ ok = false; }
+    ta.remove();
+    return ok;
+  }
+}
+
+// Copies a feed URL and flashes "Copied" on the button that was pressed.
+// label is the button's text node — the header one has an icon beside it.
+async function copyFeed(url, btn, label){
+  if(!await copyText(url)){
+    toast(t("copy.fail", url), "bad");
+    return;
+  }
+  btn.classList.add("done");
+  label.textContent = t("copy.done");
+  setTimeout(() => { btn.classList.remove("done"); label.textContent = t("copy"); }, 1600);
+}
+
+$("copyBtn").addEventListener("click", () =>
+  copyFeed(new URL("/source.json", location.href).href, $("copyBtn"), $("copyLabel")));
+
+// Group rows are rebuilt on every render, so they carry an inline handler.
+window.copyGroupFeed = function(slug, btn){
+  copyFeed(new URL(`/source/${slug}.json`, location.href).href, btn, btn.querySelector("span"));
+};
+
+/* -------------------------------------------------------------- startup */
+$("search").addEventListener("input", e => { state.filter = e.target.value; render(); });
+
+async function loadSites(){
+  const res = await api("/api/sites");
+  state.sites = res.sites || [];
+  state.defaultSite = res.default || "";
+}
+
+async function refresh(){
+  try{
+    const [cfg, apps] = await Promise.all([api("/api/config"), api("/api/apps"), loadGroups(), loadSites()]);
+    state.cfg = cfg;
+    state.apps = apps || [];
+    applyConfig();
+    render();
+  }catch(e){
+    listEl.innerHTML = `<div class="note bad" style="margin-top:20px"><span>${esc(t("list.loadFailed", e.message))}</span></div>`;
+  }
+}
+
+(function init(){
+  document.documentElement.lang = LANG === "zh" ? "zh-CN" : "en";
+  document.querySelectorAll("#langSwitch button").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.lang === LANG)));
+  applyI18n();
+  fillCategorySelect();
+
+  const u = new URL("/source.json", location.href);
+  $("urlScheme").textContent = u.protocol + "//" + u.host;
+  $("urlPath").textContent = u.pathname;
+
+  refresh();
+})();
+</script>
+</body>
+</html>

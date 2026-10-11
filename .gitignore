@@ -1,0 +1,20 @@
+# Runtime data. config.json holds a plaintext GitHub token — never commit it.
+# In production keep the data directory outside the repo and point -data at it.
+/data/
+/data-*/
+
+# Build output. Build with: go build -o bin/altstore-repo .
+/bin/
+
+# Config writes go to a .tmp file first and are renamed into place, so a crash
+# mid-write cannot leave a half-written file behind.
+*.tmp
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
