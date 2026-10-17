@@ -116,6 +116,7 @@ const I18N = {
     "tester.summaryNone": "Scanned {0} releases, nothing matched.",
     "tester.skipped": "skipped: {0}",
     "tester.assetsCount": "{0} assets",
+    "tester.changelog": "changelog: {0}",
     "tester.moreMatched": "{0} more assets matched; the first one wins",
     "tester.more": "{0} older releases not shown",
 
@@ -284,6 +285,7 @@ const I18N = {
     "tester.summaryNone": "扫描了 {0} 个 release，没有匹配到任何版本。",
     "tester.skipped": "跳过：{0}",
     "tester.assetsCount": "附件有 {0} 个",
+    "tester.changelog": "更新日志：{0}",
     "tester.moreMatched": "另有 {0} 个附件同样命中，取的是第一个",
     "tester.more": "还有 {0} 个更早的 release 未显示",
 

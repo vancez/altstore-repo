@@ -43,6 +43,7 @@ func (a asset) external() bool { return a.Type == "external" }
 type release struct {
 	TagName     string    `json:"tag_name"`
 	Name        string    `json:"name"`
+	Body        string    `json:"body"` // the release notes, as typed; markdown on both hosts
 	Draft       bool      `json:"draft"`
 	Prerelease  bool      `json:"prerelease"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -309,6 +310,12 @@ type ResolvedVersion struct {
 	ReleaseName string `json:"releaseName"`
 	ReleaseURL  string `json:"releaseUrl"`
 	Prerelease  bool   `json:"prerelease"`
+
+	// Changelog is the release's own notes, which is what AltStore shows under
+	// a version. It stays out of the JSON here: the feed carries the full text
+	// as the version's localizedDescription, and the per-app call that fills the
+	// app list would otherwise drag every release body along with it.
+	Changelog string `json:"-"`
 }
 
 // ReleasePreview describes what the regex did to a single release. The UI shows
@@ -327,6 +334,7 @@ type ReleasePreview struct {
 	Version     string   `json:"version"`
 	Size        int64    `json:"size"`
 	Date        string   `json:"date"`
+	Changelog   string   `json:"changelog,omitempty"` // opening of the release notes, flattened to one line
 }
 
 // ResolveResult is the dry-run payload behind the regex tester.
@@ -340,6 +348,11 @@ type ResolveResult struct {
 // defaultAssetRegex is what an empty pattern means. An AltStore source can only
 // ever point at an .ipa, so an empty box should not silently pick a .zip.
 const defaultAssetRegex = `(?i)\.ipa$`
+
+// previewChangelogRunes caps the release notes carried in the tester preview.
+// The feed gets the whole text; the preview only has to show that notes are
+// there, and a repo with hundreds of releases would otherwise bloat the JSON.
+const previewChangelogRunes = 160
 
 // Resolve turns releases into AltStore versions using the app's regexes. The
 // host comes from the app itself, and its token from the matching field in cfg.
@@ -460,6 +473,12 @@ func Resolve(ctx context.Context, cl *Releases, app AppConfig, cfg RepoConfig, t
 		pv.Version = version
 		pv.Size = picked.Size
 
+		// GitHub bodies normally use CRLF; the feed is read as text, so keep it LF.
+		notes := strings.ReplaceAll(strings.TrimSpace(rel.Body), "\r\n", "\n")
+		if notes != "" {
+			pv.Changelog = truncateRunes(collapseSpace(notes), previewChangelogRunes)
+		}
+
 		res.Versions = append(res.Versions, ResolvedVersion{
 			Version:     version,
 			Date:        pv.Date,
@@ -470,6 +489,7 @@ func Resolve(ctx context.Context, cl *Releases, app AppConfig, cfg RepoConfig, t
 			ReleaseName: rel.Name,
 			ReleaseURL:  rel.HTMLURL,
 			Prerelease:  rel.Prerelease,
+			Changelog:   notes,
 		})
 		res.Preview = append(res.Preview, pv)
 	}
@@ -515,6 +535,22 @@ func releaseFallbackDate(rel release) time.Time {
 		return rel.PublishedAt
 	}
 	return rel.CreatedAt
+}
+
+// collapseSpace folds every run of whitespace into a single space, so a
+// multi-line markdown body fits on the tester's one preview line.
+func collapseSpace(s string) string {
+	return strings.Join(strings.Fields(s), " ")
+}
+
+// truncateRunes cuts s down to n runes, marking the cut. Runes rather than
+// bytes, so a CJK release note is not chopped mid-character.
+func truncateRunes(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return strings.TrimSpace(string(r[:n])) + "…"
 }
 
 // versionFromTag derives a version string. With a versionRegex the first

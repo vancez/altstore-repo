@@ -226,14 +226,18 @@ func toSourceApp(app AppConfig, versions []ResolvedVersion) SourceApp {
 	}
 
 	for _, v := range versions {
-		// The version-level description is AltStore's changelog field; leaving it
-		// empty is better than repeating the app description on every release.
+		// The version-level description is AltStore's changelog field, and the
+		// release's own notes are the only thing worth putting there: they say
+		// what changed in that version. The app description does not, so a
+		// release with empty notes leaves the changelog out rather than falling
+		// back to it.
 		out.Versions = append(out.Versions, SourceVersion{
-			Version:      v.Version,
-			Date:         v.Date,
-			DownloadURL:  v.DownloadURL,
-			Size:         v.Size,
-			MinOSVersion: app.MinOSVersion,
+			Version:              v.Version,
+			Date:                 v.Date,
+			DownloadURL:          v.DownloadURL,
+			Size:                 v.Size,
+			MinOSVersion:         app.MinOSVersion,
+			LocalizedDescription: v.Changelog,
 		})
 	}
 

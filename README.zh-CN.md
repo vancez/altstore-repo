@@ -33,6 +33,8 @@ go build -o bin/altstore-repo .
 
 版本号默认取 release 的 tag 并去掉开头的 `v`。tag 形如 `build-1234` 时，在「版本提取选项」里写一个带捕获组的正则，取第 1 组作为版本号。
 
+**更新日志来自 release 自己的说明文字。** 每个版本都会带上它那个 release 的说明，写进 AltStore 的 `localizedDescription`，也就是手机上版本历史里显示的内容。release 没写说明的版本就没有日志，不会拿别的文字去凑。
+
 ## 来源站点
 
 每个应用从**一个**站点读 release，在表单里逐个应用选：
@@ -84,6 +86,7 @@ Forgejo 站点上有几点不一样：
 - **每个应用的最新版本写两份**：一份在 `versions` 数组里（AltStore 读这个），一份平铺在应用上：`version`、`versionDate`、`size`、`downloadURL`（Feather 和旧版 AltStore 读这几个）。两处永远一致，手动覆盖版本时也一样。Feather 拿应用级的 `downloadURL` 当应用的身份标识，缺了它每次刷新都会把同一个应用当成新的。
 - **版本日期**取**命中正则的那个附件自己的 `updated_at`**（不是 `published_at`，也不是同 release 里其他文件的时间）。GitHub 在补传附件时不会更新发布时刻，所以一个 2023 年发布、昨天才换过 ipa 的 release，真实时间应该是昨天。附件没带 `updated_at` 时退到它的 `created_at`（Forgejo 站点只有这个时间）。这个日期同时是版本排序依据。
 - 正则测试面板里，**没有命中任何文件的 release 也会显示一个日期**，那是该 release 里最新的附件时间，仅用于辨认，不会进入生成的源。
+- **更新日志就是 release 自己的说明文字**，每个版本一条，原样输出（Markdown 一并保留）。release 说明为空的版本就没有日志，而不是拿应用描述顶上。正则测试面板会在命中的文件下面显示该 release 说明的开头一段。
 - **预发布版本**默认排除，可在「版本提取选项」里勾选包含。
 - **草稿 release** 永远跳过。
 - **同版本号去重**，保留最新的那个。

@@ -33,6 +33,8 @@ With a password set, every path except the published feeds requires HTTP Basic a
 
 The version number defaults to the release tag with a leading `v` stripped. For a tag like `build-1234`, put a regex with a capture group under Version extraction and group 1 becomes the version.
 
+**Release notes become the changelog.** Each version carries its own release's notes in AltStore's `localizedDescription`, which is the text the device shows under a version's history. A release whose notes are empty simply has no changelog; nothing is invented to fill the gap.
+
 ## Source hosts
 
 Each app reads its releases from one host, chosen per app:
@@ -84,6 +86,7 @@ Deleting a group releases its apps to ungrouped. They stay in `all.json`, and no
 - **Each app carries its newest version twice**: in the `versions` array, which is what AltStore reads, and again at the app level as `version`, `versionDate`, `size` and `downloadURL`, which is where Feather and older AltStore builds look. The two always agree, overrides included. Feather keys an app's identity off the app-level `downloadURL`, so leaving it out makes it treat the app as new on every refresh.
 - **Version date** comes from the matched asset's own `updated_at` — not `published_at`, and not some other file in the same release. GitHub does not move the publish time when an asset is re-uploaded, so a release published in 2023 whose ipa was replaced yesterday is honestly "yesterday". Falls back to that asset's `created_at`, which is the only timestamp a Forgejo host reports. This date is also what versions are sorted by.
 - In the regex tester, **a release that matched nothing still shows a date**. That is the newest asset time in that release, for orientation only; it never reaches the generated feed.
+- **Changelogs are the release's own notes**, verbatim and markdown included, one per version. A version whose release has an empty body has no changelog rather than a copy of the app description. The regex tester shows the opening of each matched release's notes next to the file it picked.
 - **Pre-releases** are excluded by default; tick the box under Version extraction to include them.
 - **Draft releases** are always skipped.
 - **Duplicate version numbers** are deduplicated, keeping the newest.
