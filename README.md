@@ -4,7 +4,7 @@
 
 A live AltStore / SideStore source generator written in Go, with an admin UI that works on desktop and mobile.
 
-You give it a repository and one regex. The version number, download URL, upload time and file size are pulled from that repository's release API on every request — GitHub by default, or a Forgejo instance such as starforgejo.dev, picked per app. The things the host cannot know — app name, bundle ID and so on — you fill in through the web UI.
+You give it a repository and one regex. The version number, download URL, upload time and file size are pulled from that repository's release API on every request — GitHub by default, or a Forgejo instance such as starforgejo.dev, picked per app. The things the host cannot know — app name, bundle ID and so on — you fill in through the web UI, or let **Fetch info** read them from the repository's About and the newest IPA.
 
 ## Running
 
@@ -16,24 +16,35 @@ go build -o bin/altstore-repo .
 | Flag | Default | Meaning |
 |---|---|---|
 | `-addr` | `:8080` | Listen address |
-| `-data` | `data` | Config directory; state lives in `config.json` |
+| `-data` | `data` | Config directory; state lives in `config.json`, app icons in `icon/`, repo artwork in `image/` |
 | `-password` | empty | Admin UI password, or set `ALTSTORE_PASSWORD` |
 
 Open `http://localhost:8080/` for the admin UI. The feed is at `http://localhost:8080/source.json`.
 
 Outbound requests go through Go's default transport, so `HTTPS_PROXY` / `HTTP_PROXY` are honoured if the hosts are slow or blocked where this runs.
 
-With a password set, every path except the published feeds requires HTTP Basic auth. A phone has to be able to fetch a source anonymously; the admin UI should not be reachable without credentials.
+With a password set, every path except the published feeds and images requires HTTP Basic auth. A phone has to be able to fetch a source and its artwork anonymously; the admin UI should not be reachable without credentials.
 
 ## Adding an app
 
 1. **Repository** — `owner/repo`, or paste a full link. A link carries its host with it and sets **Source host** for you; a bare `owner/repo` uses whatever that dropdown says.
 2. **Asset regex** — picks the file to publish out of the release's assets. It matches against asset **filenames**; if several match, the first in the release's order wins. Empty means `(?i)\.ipa$`. Start the pattern with `(?i)` to ignore case.
 3. Press **Test**. It fetches the releases immediately and lists, for each one, which file it resolved to or why it was skipped. Save once that looks right.
+4. **Fetch info** fills the form from the repository and its newest IPA. The Description comes from the repo's About; the app name and Bundle ID come from the IPA's `Info.plist`, and the category from its `LSApplicationCategoryType` — or, when that is absent, from the App Store metadata (`iTunesMetadata.plist`) if the IPA carries it. Only a few byte ranges of the IPA are downloaded, using HTTP range requests — not the whole file. Values it finds overwrite what is already in the form, so review them and press Save. An empty answer leaves the existing value alone.
+
+The icon follows **`CFBundlePrimaryIcon`**: it uses the largest rendition of that icon inside `Assets.car` (the default appearance is preferred over dark or tinted variants), or the largest loose file named by the primary icon if the catalog is unavailable. Alternate icons are ignored. The legacy loose search over `AppIcon*`, `Icon*` and `iTunesArtwork` is only a fallback for bundles that name no primary icon or whose primary family cannot be decoded. Catalogs up to 64 MB are read; larger ones fall back to the loose files. Apple's optimized `CgBI` PNGs are converted to ordinary PNGs on the way in. The chosen image is kept at `data/icon/<bundleId>.<ext>` and published at `/icon/<bundleId>`; **Icon URL** is filled with that address. Each Fetch info replaces the previous icon, and deleting the app deletes its icon file. Self-built IPAs often carry neither a category nor store metadata, in which case the category field keeps its current value.
+
+The icon URL is built from the host you are using the admin UI through, because a device has to be able to load it. Behind a reverse proxy, browse through the public name (or pass `X-Forwarded-Proto` and `X-Forwarded-Host`) when pressing Fetch info.
+
+Clicking an app's name in the list opens its project page on the source host.
 
 The version number defaults to the release tag with a leading `v` stripped. For a tag like `build-1234`, put a regex with a capture group under Version extraction and group 1 becomes the version.
 
 **Release notes become the changelog.** Each version carries its own release's notes in AltStore's `localizedDescription`, which is the text the device shows under a version's history. A release whose notes are empty simply has no changelog; nothing is invented to fill the gap.
+
+## Repo artwork
+
+The source **Icon URL** and **Header image URL** can stay third-party links, or be copied onto this server. Paste an `http`/`https` URL and press **Save image**, or press **Upload** and choose a local file. Either way the image (PNG or JPEG, up to 10 MB) is stored as `data/image/source-icon.<ext>` or `data/image/source-header.<ext>` and published at `/image/source-icon` or `/image/source-header`. The field is replaced with that local URL; press **Save** as usual to apply the setting. Each press replaces the previous file, and both routes are public like the feeds. The local URL is built from the admin host you are using, like app icons, so behind a reverse proxy use the public name or pass `X-Forwarded-Proto` and `X-Forwarded-Host`.
 
 ## Source hosts
 
@@ -101,11 +112,16 @@ Deleting a group releases its apps to ungrouped. They stay in `all.json`, and no
 | `GET` | `/source.json` | Every app. Public, sends CORS headers |
 | `GET` | `/source/all.json` | Same as above |
 | `GET` | `/source/<slug>.json` | One group |
+| `GET` | `/icon/<bundleId>` | App icon extracted from the IPA. Public, like the feeds |
+| `GET` | `/image/<slot>` | Locally saved repo icon or header (`source-icon`, `source-header`). Public |
 | `GET` | `/` | Admin UI |
 | `GET` `PUT` | `/api/config` | Source metadata, tokens, cache time |
+| `POST` | `/api/repo/image` | Download an image URL onto this server and return its local URL |
+| `POST` | `/api/repo/image/upload` | Upload a PNG/JPEG for the same slots |
 | `GET` `POST` | `/api/groups` | List groups (with app counts) / create |
 | `PUT` `DELETE` | `/api/groups/{slug}` | Update / delete |
 | `GET` `POST` | `/api/apps` | List apps / create |
+| `POST` | `/api/apps/info` | Dry run behind Fetch info: repo About + newest IPA |
 | `PUT` `DELETE` | `/api/apps/{id}` | Update / delete |
 | `GET` | `/api/apps/{id}/versions` | Resolved versions for one app; `?force=1` bypasses the cache |
 | `POST` | `/api/resolve` | Dry run; this is what the regex tester calls |
@@ -120,7 +136,7 @@ Translations live in `web/i18n.js` (UI) and `i18n.go` (backend messages). Both f
 
 ## Configuration
 
-All state lives in `data/config.json` — plain JSON, safe to edit by hand. Writes go to a temp file and are renamed into place, so a crash mid-write cannot leave a half-written file behind.
+Configuration lives in `data/config.json` — plain JSON, safe to edit by hand. Writes go to a temp file and are renamed into place, so a crash mid-write cannot leave a half-written file behind. Icons fetched from IPAs are files under `data/icon/`; repo artwork copied from URLs is under `data/image/`.
 
 Tokens — GitHub's and Starforge's — are stored in plaintext, and each app records which host it reads from in `repoType`: `github` unless set, or `starforge`. The id names the site rather than its domain, so a site can move without invalidating stored configs. This service is meant to run for you and you alone, so keep `data/` out of any public repository.
 

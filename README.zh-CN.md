@@ -4,7 +4,7 @@
 
 用 Go 写的 AltStore / SideStore 源（source）实时生成服务。带一个适配桌面和手机的 Web 管理界面。
 
-你只管填入仓库和一条正则，剩下的版本号、下载地址、上传时间、文件大小都由服务实时向该仓库的 release 接口要——默认是 GitHub，也可以按应用切换成 Forgejo 站点（如 starforgejo.dev）；应用名称、Bundle ID 这类站点不知道的信息在网页上填。
+你只管填入仓库和一条正则，剩下的版本号、下载地址、上传时间、文件大小都由服务实时向该仓库的 release 接口要——默认是 GitHub，也可以按应用切换成 Forgejo 站点（如 starforgejo.dev）；应用名称、Bundle ID 这类站点不知道的信息在网页上填——或者点「自动获取」，从仓库 About 和最新的 IPA 里读。
 
 ## 运行
 
@@ -16,24 +16,33 @@ go build -o bin/altstore-repo .
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `-addr` | `:8080` | 监听地址 |
-| `-data` | `data` | 配置目录，状态存在 `config.json` |
+| `-data` | `data` | 配置目录，状态存在 `config.json`，应用图标在 `icon/`，仓库图片在 `image/` |
 | `-password` | 空 | 管理界面密码，也可用环境变量 `ALTSTORE_PASSWORD` |
 
 打开 `http://localhost:8080/` 进入管理界面，订阅地址是 `http://localhost:8080/source.json`。
 
 对外请求走的是 Go 默认的传输层，所以运行环境里设了 `HTTPS_PROXY` / `HTTP_PROXY` 就会生效——本机访问这些站点慢或者不通时可以用。
 
-设了密码之后，除了订阅地址之外的所有路径都要 HTTP Basic 认证——手机订阅源必须能匿名拉取，管理界面则不应该对外开放。
+设了密码之后，除了订阅地址和图片之外的所有路径都要 HTTP Basic 认证——手机订阅源和图片必须能匿名拉取，管理界面则不应该对外开放。
 
 ## 添加一个应用
 
 1. **仓库** 填 `owner/repo`，完整链接也认。粘链接时站点会跟着链接走并自动切换下面的**来源站点**；只填 `owner/repo` 就用下拉里选的那个。
 2. **资源正则** 用来从 release 的附件里挑出要发布的那个文件。正则是对**文件名**做匹配，命中多个时取该 release 里的第一个。留空等同于 `(?i)\.ipa$`。用 `(?i)` 开头可以忽略大小写。
 3. 点 **测试**，会立刻拉取 release 并列出每一个 release 命中了哪个文件、或者为什么被跳过。确认无误再保存。
+4. 点 **自动获取**，从仓库和最新的 IPA 填表：描述来自仓库的 About，应用名称、Bundle ID 来自 IPA 里的 `Info.plist`，分类来自 `LSApplicationCategoryType`；没有的话再看 IPA 里有没有 App Store 元数据（`iTunesMetadata.plist`）。IPA 只通过 HTTP Range 请求读取用到的几段，不会整个下载。取到的值会覆盖表单里已填的内容，确认后按保存；某一项没取到就保持原样。
+
+图标以 **`CFBundlePrimaryIcon`** 为准：优先取这个图标在 `Assets.car` 里最大的那一份（普通外观优先于深色/着色变体）；如果 `Assets.car` 不可用，再取主图标在包里对应的最大独立文件。备用图标不会被选中。只有包没有声明主图标、或者主图标全部解码失败时，才会退回 `AppIcon*`、`Icon*`、`iTunesArtwork` 的旧式搜索。`Assets.car` 最大读取 64 MB，更大的包会退回独立文件。Apple 优化过的 `CgBI` PNG 会在保存前转成普通 PNG。选中的图片存到 `data/icon/<bundleId>.<ext>`，并通过 `/icon/<bundleId>` 对外提供，**图标 URL** 自动填成这个地址。每次点自动获取都会覆盖旧图标，删除应用时图标文件一并删除。自己构建的 IPA 经常既没有分类字段、也没有 App Store 元数据，这时分类保持原样。
+
+图标 URL 是按你访问管理界面时用的主机名生成的，因为手机必须能访问到它。放在反向代理后面时，请用对外域名访问再点自动获取（或者让代理传 `X-Forwarded-Proto`、`X-Forwarded-Host`）。点击应用列表里的名称会打开该项目在来源站点上的页面。
 
 版本号默认取 release 的 tag 并去掉开头的 `v`。tag 形如 `build-1234` 时，在「版本提取选项」里写一个带捕获组的正则，取第 1 组作为版本号。
 
 **更新日志来自 release 自己的说明文字。** 每个版本都会带上它那个 release 的说明，写进 AltStore 的 `localizedDescription`，也就是手机上版本历史里显示的内容。release 没写说明的版本就没有日志，不会拿别的文字去凑。
+
+## 仓库图片
+
+源的**图标 URL**和**头图 URL**可以直接用外部链接，也可以复制到本服务。在「仓库设置」里把 `http`/`https` 图片地址填入对应输入框点**保存图片**，或者点**上传**选择本地文件。两种方式都会把图片（PNG 或 JPEG，最大 10 MB）存为 `data/image/source-icon.<ext>` 或 `data/image/source-header.<ext>`，并通过 `/image/source-icon` 或 `/image/source-header` 对外提供。输入框会替换成这个本地地址，再按「保存」才会写入配置。每次操作都会覆盖旧文件；这两个图片地址和订阅地址一样公开。本地地址同样按你访问管理界面的主机生成；放在反向代理后面时，请用对外域名访问，或让代理传 `X-Forwarded-Proto` / `X-Forwarded-Host`。
 
 ## 来源站点
 
@@ -101,11 +110,16 @@ Forgejo 站点上有几点不一样：
 | `GET` | `/source.json` | 全部应用，公开，带 CORS |
 | `GET` | `/source/all.json` | 同上 |
 | `GET` | `/source/<分组>.json` | 单个分组 |
+| `GET` | `/icon/<bundleId>` | 从 IPA 提取的应用图标，和订阅地址一样公开 |
+| `GET` | `/image/<slot>` | 本地保存的仓库图标/头图（`source-icon`、`source-header`），公开 |
 | `GET` | `/` | 管理界面 |
 | `GET` `PUT` | `/api/config` | 源的元信息、各个站点的 Token、缓存时间 |
+| `POST` | `/api/repo/image` | 把图片 URL 下载到本服务，返回本地地址 |
+| `POST` | `/api/repo/image/upload` | 上传 PNG/JPEG 到同样的位置 |
 | `GET` `POST` | `/api/groups` | 分组列表（含各分组应用数）/ 新建 |
 | `PUT` `DELETE` | `/api/groups/{slug}` | 修改 / 删除 |
 | `GET` `POST` | `/api/apps` | 应用列表 / 新增 |
+| `POST` | `/api/apps/info` | 「自动获取」的干跑接口：仓库 About + 最新 IPA |
 | `PUT` `DELETE` | `/api/apps/{id}` | 修改 / 删除 |
 | `GET` | `/api/apps/{id}/versions` | 某个应用的解析结果，`?force=1` 跳过缓存 |
 | `POST` | `/api/resolve` | 干跑，正则测试用的就是它 |
@@ -120,7 +134,7 @@ Forgejo 站点上有几点不一样：
 
 ## 配置
 
-状态全在 `data/config.json`，纯 JSON，可以直接编辑。写入用的是「先写临时文件再改名」，中途崩溃不会留下半个文件。
+配置全在 `data/config.json`，纯 JSON，可以直接编辑。写入用的是「先写临时文件再改名」，中途崩溃不会留下半个文件。从 IPA 取到的图标是 `data/icon/` 下的普通文件；从 URL 复制下来的仓库图标和头图在 `data/image/` 下。
 
 管理界面里的 Token（GitHub 和 Starforge）都是明文存的，每个应用从哪个站点读记在 `repoType` 里：`github`（不填即此）或 `starforge`。这个 id 指的是站点本身而不是域名，站点换域名不会让已有配置失效。这个服务是给你自己用的，别把 `data/` 提交到公开仓库。
 

@@ -12,7 +12,7 @@ import (
 
 func main() {
 	addr := flag.String("addr", ":8080", "listen address")
-	dataDir := flag.String("data", "data", "directory for config.json")
+	dataDir := flag.String("data", "data", "directory for config.json and saved images")
 	password := flag.String("password", os.Getenv("ALTSTORE_PASSWORD"), "password for the admin UI; empty disables auth (localhost only)")
 	flag.Parse()
 

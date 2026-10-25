@@ -109,6 +109,7 @@ func defaultDB() DB {
 type Store struct {
 	mu   sync.RWMutex
 	path string
+	dir  string // data directory; icons live in dir/icon
 	db   DB
 }
 
@@ -116,7 +117,13 @@ func NewStore(dataDir string) (*Store, error) {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
-	s := &Store{path: filepath.Join(dataDir, "config.json"), db: defaultDB()}
+	if err := os.MkdirAll(filepath.Join(dataDir, "icon"), 0o755); err != nil {
+		return nil, fmt.Errorf("create icon dir: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Join(dataDir, "image"), 0o755); err != nil {
+		return nil, fmt.Errorf("create image dir: %w", err)
+	}
+	s := &Store{path: filepath.Join(dataDir, "config.json"), dir: dataDir, db: defaultDB()}
 
 	raw, err := os.ReadFile(s.path)
 	switch {
@@ -197,6 +204,25 @@ func (s *Store) App(id string) (AppConfig, bool) {
 		}
 	}
 	return AppConfig{}, false
+}
+
+// IconInUse reports whether any app or group still refers to this bundle's
+// icon, by bundle ID or by a stored icon URL. A group made from an app copies
+// that app's icon URL, so an icon can outlive the app that introduced it.
+func (s *Store) IconInUse(bundleID string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, a := range s.db.Apps {
+		if a.BundleID == bundleID || iconURLReferences(a.IconURL, bundleID) {
+			return true
+		}
+	}
+	for _, g := range s.db.Groups {
+		if iconURLReferences(g.IconURL, bundleID) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Store) AddApp(a AppConfig) (AppConfig, error) {

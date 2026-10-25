@@ -176,6 +176,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
    unbreakable token like com.example.app refuses to shrink and widens
    the whole page instead of truncating. */
 .row-title h3{margin:0;font-size:15.5px;font-weight:600;letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* The title opens the project page; it should still read as the row's heading,
+   not as another link in the metadata line. */
+.row-title h3 a{color:inherit}
+.row-title h3 a:hover{color:var(--accent);text-decoration:none}
 .pill{
   font-family:var(--mono);font-size:11.5px;padding:2px 8px;border-radius:99px;
   background:var(--accent-wash);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);
@@ -276,6 +280,8 @@ legend{
 .field > label{display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:color-mix(in srgb,var(--text) 88%,transparent)}
 .field .hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
 .field .hint code{font-family:var(--mono);font-size:11.5px;background:var(--panel-2);padding:1.5px 5px;border-radius:4px;color:var(--accent)}
+.fetchbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px}
+.fetchbar .hint{flex:1 1 200px;min-width:0;font-size:12px;color:var(--muted);line-height:1.5}
 .grid2{display:grid;grid-template-columns:1fr;gap:0 14px}
 .inline{display:flex;align-items:center;gap:10px}
 .check-row{margin:0 0 15px}
@@ -294,6 +300,9 @@ details.adv[open] > summary::before{transform:rotate(45deg)}
 details.adv[open] > summary{border-bottom:1px solid var(--line-soft);color:var(--text)}
 .adv-body{padding:16px 14px 4px}
 .color-row{display:flex;gap:8px;align-items:center}
+.url-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.url-row input{flex:1 1 220px;min-width:0;width:auto}
+.url-row .btn{flex:none}
 .color-row input[type=color]{
   width:46px;height:40px;padding:3px;flex:none;cursor:pointer;background:var(--panel);
 }
@@ -516,6 +525,13 @@ details.adv[open] > summary{border-bottom:1px solid var(--line-soft);color:var(-
 
       <fieldset>
         <legend data-i18n="app.section.info">App info</legend>
+        <div class="fetchbar">
+          <button type="button" class="btn sm" id="fetchInfoBtn">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 2.5v8m0 0 3-3m-3 3-3-3M3 13.5h10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span data-i18n="app.fetch">Fetch info</span>
+          </button>
+          <span class="hint" data-i18n="app.fetchHint"></span>
+        </div>
         <div class="grid2">
           <div class="field">
             <label for="f_name" data-i18n="app.name">App name</label>
@@ -644,11 +660,21 @@ details.adv[open] > summary{border-bottom:1px solid var(--line-soft);color:var(-
           </div>
           <div class="field span2">
             <label for="c_iconURL" data-i18n="cfg.iconURL">Icon URL</label>
-            <input id="c_iconURL" name="iconURL" class="mono">
+            <div class="url-row">
+              <input id="c_iconURL" name="iconURL" class="mono">
+              <button type="button" class="btn sm" data-localize="icon" data-i18n="cfg.saveImage">Save image</button>
+              <button type="button" class="btn sm" data-upload="icon" data-i18n="cfg.uploadImage">Upload</button>
+              <input type="file" id="c_iconFile" accept="image/png,image/jpeg" hidden>
+            </div>
           </div>
           <div class="field span2">
             <label for="c_headerURL" data-i18n="cfg.headerURL">Header image URL</label>
-            <input id="c_headerURL" name="headerURL" class="mono">
+            <div class="url-row">
+              <input id="c_headerURL" name="headerURL" class="mono">
+              <button type="button" class="btn sm" data-localize="header" data-i18n="cfg.saveImage">Save image</button>
+              <button type="button" class="btn sm" data-upload="header" data-i18n="cfg.uploadImage">Upload</button>
+              <input type="file" id="c_headerFile" accept="image/png,image/jpeg" hidden>
+            </div>
           </div>
           <div class="field">
             <label for="c_website" data-i18n="cfg.website">Website</label>
@@ -893,10 +919,15 @@ const absDate = iso => {
 };
 
 async function api(path, opts = {}){
+  // A FormData body must keep the browser-generated multipart boundary; only
+  // JSON bodies get the explicit content type and serialisation.
+  const form = opts.body instanceof FormData;
   const res = await fetch(path, {
-    headers: {"Content-Type":"application/json", "Accept-Language": LANG},
+    headers: form
+      ? {"Accept-Language": LANG}
+      : {"Content-Type":"application/json", "Accept-Language": LANG},
     ...opts,
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
+    body: opts.body ? (form ? opts.body : JSON.stringify(opts.body)) : undefined,
   });
   const text = await res.text();
   let data = null;
@@ -958,11 +989,13 @@ function render(){
     const icon = a.iconURL
       ? `<img class="icon" src="${esc(a.iconURL)}" alt="" loading="lazy" data-initial="${esc(initial)}">`
       : `<div class="icon mono-face">${esc(initial)}</div>`;
+    const project = projectURL(a);
+    const title = esc(a.name || a.repo);
     return `<article class="row ${a.enabled ? "" : "off"}" style="--tint:${esc(tint)}">
       ${icon}
       <div class="row-main">
         <div class="row-title">
-          <h3>${esc(a.name || a.repo)}</h3>
+          <h3>${project ? `<a href="${esc(project)}" target="_blank" rel="noopener noreferrer" title="${esc(t("row.openProject"))}">${title}</a>` : title}</h3>
           ${a.enabled ? "" : `<span class="pill quiet">${esc(t("row.disabled"))}</span>`}
           ${a.group ? `<span class="pill" title="${esc(t("row.groupTitle", a.group))}">${esc(a.group)}</span>` : ""}
           ${a.category ? `<span class="pill quiet">${esc(CATEGORY_LABEL[a.category] || a.category)}</span>` : ""}
@@ -1056,6 +1089,14 @@ function shownHost(id){
   const s = siteByID(id);
   return s && s.id !== state.defaultSite ? s.domain : "";
 }
+// Where the app's name goes. The host table already knows which site a repo
+// lives on, so owner/name is enough to build the project page.
+function projectURL(a){
+  const s = siteByID(a.repoType);
+  if(!s || !a.repo) return "";
+  const repo = a.repo.split("/").map(encodeURIComponent).join("/");
+  return `https://${s.domain}/${repo}`;
+}
 
 // Runs after setForm: an app with no repoType of its own — a new one, or one
 // whose value the select has no option for — would otherwise leave the picker
@@ -1129,6 +1170,44 @@ function toggleExternal(){
   $("f_externalWrap").hidden = !site || site.dialect !== "forgejo";
 }
 $("c_tintColor_pick").addEventListener("input", e => $("c_tintColor").value = e.target.value);
+
+// Fetch info reads the repo's About and the newest IPA, then overwrites the
+// fields it found something for. It does not save: the values land in the form
+// so they can be checked first. An empty answer leaves the current value alone
+// rather than erasing a description the host does not know.
+$("fetchInfoBtn").addEventListener("click", async () => {
+  const repo = $("f_repo").value.trim();
+  if(!repo){ toast(t("tester.needRepo"), "bad"); $("f_repo").focus(); return; }
+  const btn = $("fetchInfoBtn");
+  const label = btn.querySelector("span");
+  const editing = state.editing;
+  btn.disabled = true;
+  label.textContent = t("app.fetching");
+  try{
+    const info = await api("/api/apps/info", {method:"POST", body: getForm($("appForm"))});
+    // The drawer may have moved on to another app while the request was in
+    // flight; those values belong to the form that is no longer showing.
+    if(state.editing !== editing || openDrawer !== $("appDrawer") || $("f_repo").value.trim() !== repo) return;
+    const fields = [
+      ["f_name", info.name],
+      ["f_bundleIdentifier", info.bundleIdentifier],
+      ["f_category", info.category],
+      ["f_localizedDescription", info.localizedDescription],
+      ["f_iconURL", info.iconURL],
+    ];
+    for(const [id, value] of fields){
+      if(value) $(id).value = value;
+    }
+    if(info.name) updateGroupHint();
+    toast(t("toast.infoFetched"), "good");
+    for(const w of info.warnings || []) toast(w, "bad");
+  }catch(e){
+    toast(e.message, "bad");
+  }finally{
+    btn.disabled = false;
+    label.textContent = t("app.fetch");
+  }
+});
 
 $("saveBtn").addEventListener("click", async () => {
   const form = $("appForm");
@@ -1295,6 +1374,62 @@ $("cfgSaveBtn").addEventListener("click", async () => {
   }finally{
     btn.disabled = false; btn.textContent = t("btn.save");
   }
+});
+
+// Repo artwork often lives on a third-party host that can move, rate-limit or
+// demand a referer. This copies the image onto this server and puts the local
+// URL back in the field; the normal Save then persists the setting.
+document.querySelectorAll("[data-localize]").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const input = btn.dataset.localize === "header" ? $("c_headerURL") : $("c_iconURL");
+    const url = input.value.trim();
+    if(!url){ toast(t("cfg.imageUrlRequired"), "bad"); input.focus(); return; }
+    btn.disabled = true;
+    btn.textContent = t("btn.saving");
+    try{
+      const res = await api("/api/repo/image", {method:"POST", body:{url, kind: btn.dataset.localize}});
+      // The drawer may have moved on while the image was downloading.
+      if(openDrawer !== $("cfgDrawer") || input.value.trim() !== url) return;
+      input.value = res.url;
+      toast(t("cfg.imageSaved"), "good");
+    }catch(e){
+      toast(e.message, "bad");
+    }finally{
+      btn.disabled = false;
+      btn.textContent = t("cfg.saveImage");
+    }
+  });
+});
+
+// Local file equivalent of the URL downloader. The URL field is replaced the
+// same way; the normal Save still persists the setting.
+document.querySelectorAll("[data-upload]").forEach(btn => {
+  const slot = btn.dataset.upload;
+  const fileInput = slot === "header" ? $("c_headerFile") : $("c_iconFile");
+  const urlInput = slot === "header" ? $("c_headerURL") : $("c_iconURL");
+  btn.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files && fileInput.files[0];
+    if(!file) return;
+    const before = urlInput.value.trim();
+    btn.disabled = true;
+    btn.textContent = t("cfg.uploading");
+    try{
+      const form = new FormData();
+      form.append("kind", slot);
+      form.append("file", file, file.name);
+      const res = await api("/api/repo/image/upload", {method:"POST", body: form});
+      if(openDrawer !== $("cfgDrawer") || urlInput.value.trim() !== before) return;
+      urlInput.value = res.url;
+      toast(t("cfg.imageUploaded"), "good");
+    }catch(e){
+      toast(e.message, "bad");
+    }finally{
+      btn.disabled = false;
+      btn.textContent = t("cfg.uploadImage");
+      fileInput.value = "";
+    }
+  });
 });
 
 function applyConfig(){

@@ -115,6 +115,50 @@ func (r *Releases) Releases(ctx context.Context, h repoHost, repo, token string,
 	return releases, nil
 }
 
+// RepoDescription reads the repository's About text. Both APIs expose it as
+// the repository's "description"; it is the only prose about the app that the
+// host itself knows, and it is what the app form fills from.
+func (r *Releases) RepoDescription(ctx context.Context, h repoHost, repo, token string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		fmt.Sprintf("%s/repos/%s", h.apiBase, escapeRepo(repo)), nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", userAgent)
+	if h.dialect == dialectGitHub {
+		req.Header.Set("Accept", "application/vnd.github+json")
+		req.Header.Set("X-GitHub-Api-Version", ghVersion)
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+	} else {
+		req.Header.Set("Accept", "application/json")
+		if token != "" {
+			req.Header.Set("Authorization", "token "+token)
+		}
+	}
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return "", trf(ctx, msgRepoRequestFail, h.domain, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("%s: %s", repo, apiErrorMessage(ctx, resp, h))
+	}
+
+	var payload struct {
+		Description *string `json:"description"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&payload); err != nil {
+		return "", trf(ctx, msgRepoDecodeFail, h.domain, err)
+	}
+	if payload.Description == nil {
+		return "", nil
+	}
+	return strings.TrimSpace(*payload.Description), nil
+}
+
 func (r *Releases) fetch(ctx context.Context, h repoHost, repo, token, etag string) ([]release, string, bool, error) {
 	if h.dialect == dialectForgejo {
 		releases, err := r.fetchForgejo(ctx, h, repo, token)

@@ -60,6 +60,33 @@ const (
 	msgGroupIdentClash   msg = "group.identClash"
 	msgGroupIdentTaken   msg = "group.identTaken"
 
+	msgInfoNoVersion msg = "info.noVersion"
+	msgAboutFail     msg = "info.aboutFail"
+
+	msgIPARequestFail msg = "ipa.requestFail"
+	msgIPARangeNeeded msg = "ipa.rangeNeeded"
+	msgIPAInvalid     msg = "ipa.invalid"
+	msgIPANoPlist     msg = "ipa.noPlist"
+	msgIPAPlist       msg = "ipa.plist"
+	msgIPARead        msg = "ipa.read"
+	msgIPATooLarge    msg = "ipa.tooLarge"
+	msgIPAUnsupported msg = "ipa.unsupported"
+	msgIPANoBundle    msg = "ipa.noBundle"
+	msgIPANoIcon      msg = "ipa.noIcon"
+
+	msgIconUnsafe msg = "icon.unsafe"
+	msgIconSave   msg = "icon.save"
+
+	msgImageURLRequired  msg = "image.urlRequired"
+	msgImageURLBad       msg = "image.urlBad"
+	msgImageFetchFail    msg = "image.fetchFail"
+	msgImageTooLarge     msg = "image.tooLarge"
+	msgImageUnsupported  msg = "image.unsupported"
+	msgImageKindBad      msg = "image.kindBad"
+	msgImageSaveFail     msg = "image.saveFail"
+	msgImageFileRequired msg = "image.fileRequired"
+	msgImageUploadBad    msg = "image.uploadBad"
+
 	msgSourceNeedsJSON msg = "source.needsJson"
 	msgSourceNoGroup   msg = "source.noGroup"
 	msgBadRequest      msg = "request.badJson"
@@ -206,6 +233,101 @@ var messages = map[msg][2]string{
 	msgGroupIdentTaken: {
 		"Identifier is already used by group %q",
 		"标识符已被分组 %q 使用",
+	},
+
+	msgInfoNoVersion: {
+		"No installable IPA was found for this repository; check the asset regex with Test",
+		"这个仓库里没有找到可用的 IPA，先用「测试」检查资源正则",
+	},
+	msgAboutFail: {
+		"Could not read the repository About: %v",
+		"读取仓库 About 简介失败：%v",
+	},
+
+	msgIPARequestFail: {
+		"Could not fetch the IPA: %v",
+		"获取 IPA 失败：%v",
+	},
+	msgIPARangeNeeded: {
+		"The IPA's host does not support HTTP range requests, so the file cannot be read without downloading it whole",
+		"IPA 所在服务器不支持 HTTP Range 请求，没法只读取需要的部分",
+	},
+	msgIPAInvalid: {
+		"The download is not a valid IPA (zip): %v",
+		"下载到的文件不是有效的 IPA（zip）：%v",
+	},
+	msgIPANoPlist: {
+		"No Info.plist found in the IPA",
+		"IPA 里没有找到 Info.plist",
+	},
+	msgIPAPlist: {
+		"Could not read Info.plist: %v",
+		"读取 Info.plist 失败：%v",
+	},
+	msgIPARead: {
+		"Could not read %s from the IPA: %v",
+		"读取 IPA 里的 %s 失败：%v",
+	},
+	msgIPATooLarge: {
+		"%s in the IPA is too large to read",
+		"IPA 里的 %s 太大，无法读取",
+	},
+	msgIPAUnsupported: {
+		"%s in the IPA uses an unsupported compression method",
+		"IPA 里的 %s 使用了不支持的压缩方式",
+	},
+	msgIPANoBundle: {
+		"The IPA has no CFBundleIdentifier; Bundle ID was left unchanged",
+		"IPA 里没有 CFBundleIdentifier，Bundle ID 保持原样",
+	},
+	msgIPANoIcon: {
+		"No app icon found in the IPA",
+		"IPA 里没有找到应用图标",
+	},
+	msgIconUnsafe: {
+		"Bundle ID %q cannot be used as an icon filename, so the icon was not saved",
+		"Bundle ID %q 不能用作图标文件名，图标未保存",
+	},
+	msgIconSave: {
+		"Could not save the icon: %v",
+		"保存图标失败：%v",
+	},
+
+	msgImageURLRequired: {
+		"Fill in an image URL first",
+		"先填写图片地址",
+	},
+	msgImageURLBad: {
+		"Only http and https image URLs are supported",
+		"只支持 http/https 图片地址",
+	},
+	msgImageFetchFail: {
+		"Could not fetch the image: %v",
+		"获取图片失败：%v",
+	},
+	msgImageTooLarge: {
+		"The image is larger than %d MB",
+		"图片超过 %d MB",
+	},
+	msgImageUnsupported: {
+		"The URL does not point to a PNG or JPEG image",
+		"这个地址不是 PNG 或 JPEG 图片",
+	},
+	msgImageKindBad: {
+		"Unknown image slot %q",
+		"未知的图片位置 %q",
+	},
+	msgImageSaveFail: {
+		"Could not save the image: %v",
+		"保存图片失败：%v",
+	},
+	msgImageFileRequired: {
+		"Choose an image file to upload",
+		"请选择要上传的图片",
+	},
+	msgImageUploadBad: {
+		"Could not read the uploaded image: %v",
+		"读取上传的图片失败：%v",
 	},
 
 	msgSourceNeedsJSON: {

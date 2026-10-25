@@ -42,6 +42,7 @@ const I18N = {
     "row.loadFailed": "load failed",
     "row.noVersions": "no matching version",
     "row.edit": "Edit",
+    "row.openProject": "Open the project page",
 
     "date.today": "today",
     "date.yesterday": "yesterday",
@@ -74,6 +75,9 @@ const I18N = {
     "app.developerPh": "Defaults to the repo owner",
     "app.category": "Category",
     "app.category.none": "Unspecified",
+    "app.fetch": "Fetch info",
+    "app.fetching": "Fetching…",
+    "app.fetchHint": "Reads the repository About for the description, and the newest IPA for the name, Bundle ID, category and icon. Values it finds overwrite what is already filled in.",
     "app.group": "Group",
     "app.subtitle": "Subtitle",
     "app.description": "Description",
@@ -129,6 +133,12 @@ const I18N = {
     "cfg.description": "Description",
     "cfg.iconURL": "Icon URL",
     "cfg.headerURL": "Header image URL",
+    "cfg.saveImage": "Save image",
+    "cfg.uploadImage": "Upload",
+    "cfg.uploading": "Uploading…",
+    "cfg.imageUrlRequired": "Fill in an image URL first",
+    "cfg.imageSaved": "Image saved; press Save to apply",
+    "cfg.imageUploaded": "Image uploaded; press Save to apply",
     "cfg.website": "Website",
     "cfg.tintColor": "Tint colour",
     "cfg.section.github": "GitHub API",
@@ -172,7 +182,8 @@ const I18N = {
 
     "toast.saved": "Saved",
     "toast.groupCreated": "Saved, and created the group {0}",
-    "toast.deleted": "Deleted"
+    "toast.deleted": "Deleted",
+    "toast.infoFetched": "Info fetched"
   },
 
   zh: {
@@ -211,6 +222,7 @@ const I18N = {
     "row.loadFailed": "读取失败",
     "row.noVersions": "没有匹配的版本",
     "row.edit": "编辑",
+    "row.openProject": "打开项目页面",
 
     "date.today": "今天",
     "date.yesterday": "昨天",
@@ -243,6 +255,9 @@ const I18N = {
     "app.developerPh": "留空则用仓库 owner",
     "app.category": "分类",
     "app.category.none": "未指定",
+    "app.fetch": "自动获取",
+    "app.fetching": "获取中…",
+    "app.fetchHint": "从仓库 About 读取描述，从最新的 IPA 读取名称、Bundle ID、分类和图标；取到的值会覆盖已填内容。",
     "app.group": "所属分组",
     "app.subtitle": "副标题",
     "app.description": "描述",
@@ -298,6 +313,12 @@ const I18N = {
     "cfg.description": "描述",
     "cfg.iconURL": "图标 URL",
     "cfg.headerURL": "头图 URL",
+    "cfg.saveImage": "保存图片",
+    "cfg.uploadImage": "上传",
+    "cfg.uploading": "上传中…",
+    "cfg.imageUrlRequired": "先填写图片地址",
+    "cfg.imageSaved": "图片已保存，按「保存」生效",
+    "cfg.imageUploaded": "图片已上传，按「保存」生效",
     "cfg.website": "网站",
     "cfg.tintColor": "色调",
     "cfg.section.github": "GitHub 接口",
@@ -341,7 +362,8 @@ const I18N = {
 
     "toast.saved": "已保存",
     "toast.groupCreated": "已保存，并新建分组 {0}",
-    "toast.deleted": "已删除"
+    "toast.deleted": "已删除",
+    "toast.infoFetched": "已获取信息"
   }
 };
 
